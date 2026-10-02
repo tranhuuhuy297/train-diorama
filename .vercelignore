@@ -1,0 +1,9 @@
+tests/
+tools/
+docs/
+.parity-cache/
+.parity-output/
+node_modules/
+package.json
+package-lock.json
+.claude/

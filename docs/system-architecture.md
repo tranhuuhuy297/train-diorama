@@ -1,0 +1,595 @@
+# System architecture
+
+Mirrors the project's cross-module contracts. This file is a living summary; later phases append
+their own sections (engine, world, train, life) without rewriting what is here.
+
+## Runtime
+
+Vanilla ESM, no bundler. `index.html` ships an import map:
+
+```json
+{ "imports": {
+  "three": "https://unpkg.com/three@0.186.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.186.0/examples/jsm/"
+} }
+```
+
+Node tests resolve the same bare `three` specifier from the `three` devDependency (its package
+`exports` map also serves `three/addons/*`), so engine code imports cleanly in both the browser
+and `node --test`.
+
+## Module map (this phase)
+
+```
+index.html
+  ├ styles/*.css  (base-reset-and-utilities → hud-panel-and-controls → loading-overlay
+  │                 → toast-and-debug-menu → night-theme-overrides)
+  └ src/main-entry.js
+      ├ ui/settings-schema-defaults.js
+      ├ ui/settings-local-storage-persistence.js
+      ├ ui/hud-button-renderers.js
+      ├ ui/hud-state-actions.js
+      ├ ui/hud-dom-event-bindings.js
+      ├ ui/keyboard-shortcuts.js
+      ├ ui/shortcut-toast.js
+      ├ ui/loading-screen-step-runner.js
+      ├ ui/debug-menu-panel.js            (mounted after loading; imports hud-button-renderers' element())
+      ├ engine/parity-test-hook.js        (no imports; dormant without ?parity)
+      └ ⇢ engine/diorama.js (dynamic import; engine facade: renderer, cameras/controls, shadow +
+                             post passes, frame loop; see Engine module graph below)
+```
+
+No cycles. Renderer modules (`hud-button-renderers.js`) import only the settings schema.
+
+## Boot order (`src/main-entry.js`)
+
+1. Load settings, create the saver, create a mutable (initially unset) `diorama` binding, create
+   the HUD actions bound to a `getDiorama()` getter.
+2. Render the HUD from state (`renderModes`, `renderToggles`, `renderTimeOfDay`), bind HUD DOM
+   events, bind keyboard shortcuts, register a once-only `pagehide` disposer. Every call these
+   make onto the diorama is optional-chained, since it may not exist yet.
+3. Run three weighted loading steps: import the engine module (30), construct `Diorama`, apply
+   the nine pieces of saved state to it in a fixed order ending with `prepareOverviewIntro()`,
+   then `installParityTestHook(diorama)` in the same synchronous task (60), wait one animation
+   frame (10).
+4. Log `[GAMEPLAY] Started`; if an overview intro was prepared, start it and log
+   `[CAMERA] Overview intro started`; `mountDebugMenu(diorama)`; toast `H · Hide HUD`. Errors
+   anywhere in `boot()` are caught and passed to `console.error`.
+
+Because step 3 applies state by calling the diorama directly (not through the HUD actions), boot
+never produces a `[CAMERA] Mode` log or a save; `localStorage` stays `null` until the first user
+action.
+
+## DOM contract
+
+22 static ids are looked up through `element(id)`, which throws `Missing interface element: <id>`
+on a miss. Five containers are rendered dynamically (`#camera-modes`, `#time-of-day`, `#toggles`,
+`#outline-toggle`, `#pixel-resolution`); their serialized markup (attribute order, class-token
+order, text) is part of parity, not just their visual result. State hooks: `body[data-time-of-day]`,
+`body.hud-hidden`, `#shortcut-toast.is-visible` / `.hud-hidden`, `#loading.is-working` /
+`.is-gone` / `[hidden]` / `[aria-busy]`, `#help[hidden]`, `#controls-button[aria-expanded]`.
+Runtime-only DOM: the canvas inside `#scene`, and `details#debug-menu` appended to `body` after
+loading (see "Debug menu and parity hook" below; its own ids `debug-layers` and
+`debug-performance` go through the same `element(id)` lookup).
+
+## CSS cascade design
+
+Tailwind's compiled output puts utilities inside `@layer utilities` (preflight in `@layer base`);
+every hand-written component rule in the original is unlayered, so it always wins regardless of
+selector specificity (per the CSS Cascade Layers spec, an unlayered rule beats any layered rule).
+The clone reproduces this exactly:
+
+- `styles/base-reset-and-utilities.css` declares `@layer base, utilities;` first, then a preflight
+  subset in `base` and 69 utility rules in `utilities`.
+- `:root` radius variables and a second `[hidden] { display: none !important; }` rule sit
+  unlayered at the bottom of that same file. Both `[hidden]` rules (the layered one in `base` and
+  this unlayered copy) carry `!important`, so either alone already beats a normal declaration such
+  as `#loading { display: grid }` regardless of layer (an `!important` declaration wins over every
+  normal declaration, whatever layer it is in); the unlayered copy exists to mirror the original's
+  cascade structure, not because the layered rule needs help winning.
+- `hud-panel-and-controls.css`, `loading-overlay.css`, `toast-and-debug-menu.css` and
+  `night-theme-overrides.css` are all unlayered component files, loaded in that order, with the
+  night overrides last so they win any same-specificity conflict.
+
+## Diorama facade (P01 stub replaced by the real engine in P03)
+
+`src/engine/diorama.js` exports a `Diorama` class that satisfies the UI contract (fields, camera
+modes, time-of-day ids, the overview dolly-in intro, `logCameraPose`). From P03 on it is the real
+engine: a `WebGLRenderer`, the frame loop, the sky dome, shadow/post passes and the overview
+camera. The world (P05) and the train (P07, see "Train" below) are composed in; birds are added at
+their reserved constructor slot in a later phase without changing this file's public surface.
+
+## Placeholders for later phases
+
+- `world/*`: the core (terrain, track, bridge) landed in P05 (see "World core" below); station,
+  village, windmill, trees, rocks, water, sky, balloon and perches are added across P06–P13.
+- `train/*`: landed in P07 (see "Train" below).
+- `life/*` (villagers, sheep, station travellers, birds): added across P09–P13.
+
+## Shared lighting uniform bag (`src/materials/shared-lighting-uniforms.js`)
+
+Every shader material in this scene reads the same handful of `{ value }` objects by reference,
+so a writer's mutation (palette transitions, the shadow pass, the headlight rig) is visible to
+every material on the next draw with no rebinding pass. Consumers hold references and never
+`.clone()` a `ShaderMaterial` or replace a bag entry (the containers are `Object.freeze`d).
+
+| Bag | Keys (order) | Notes |
+|---|---|---|
+| `G` | uLightDir, uLightColor, uShadowTint, uAmbient, uShadowMap, uShadowMatrix, uShadowTexel, uFogColor, uFogNear, uFogFar, uTime, uZenith, uHorizon, uHill, uMist, uSunColor | 16 entries; written by the P03 palette/shadow/render-pipeline code |
+| `NIGHT_UNIFORMS` | uNight, uSaturation, uHeadlightPosition, uHeadlightDirection | uSaturation is read only by the post pass (P03) |
+| `SHADER_NIGHT_UNIFORMS` | uNight, uHeadlightPosition, uHeadlightDirection | a frozen *view* onto the same three `NIGHT_UNIFORMS` objects — the set every shader material spreads |
+| `LIGHTING_UNIFORMS` | the 16 `G` keys, then the 4 `NIGHT_UNIFORMS` keys | exposed later as `diorama.lightingUniforms` |
+
+Additive exports beyond the cross-module contract (documented here per the contract's own
+allowance): `SHADER_NIGHT_UNIFORMS`; `ADDITIVE_GLOW_RENDER_STATE` (`{transparent, depthWrite,
+blending}`, frozen), the single render-state object spread by both `createLightCone` and
+`createLightGlows` so the two factories cannot drift apart; and from
+`src/core/seeded-prng-and-gradient-noise.js`, `NOISE_PERMUTATION_TABLE` (`Uint8Array(512)`) and
+`NOISE_GRADIENT_TABLE` (`[cos, sin][256]`) — both are read-only by convention and exist for tests
+only.
+
+**Contract §2 correction:** sky, water and waterfall materials (P03/P12) spread the full
+`SHADER_NIGHT_UNIFORMS` set (uNight + the headlight pair), not just `G + uNight` — verified
+against the original source. This has no visual effect, since three.js silently ignores uniforms
+absent from a program's active set; it only matters for uniform-key parity assertions.
+
+## NPR cel material (`src/materials/npr-cel-material-factory.js` + `materials/glsl/*`)
+
+`npr(options = {})` returns a cached `THREE.ShaderMaterial`. **Identity rule:** the cache key is
+`JSON.stringify(options)`, so two call sites share one material instance *iff* their option
+literals are identical, including key order (`undefined` values drop out, as JSON does). Callers
+must pass the exact literal shape listed at each call site in later phases — never a normalised
+or reordered one — or the merge-batch partition and draw-call count will drift from the original.
+
+Defines are inserted only for truthy options, in a fixed order: `FLOWERS, STRATA, DOUBLE_SIDED,
+TREE_SWAY, NIGHT_GLOW, LOCAL_GLOW`. Uniform key order: the 16 `G` entries, the 3
+`SHADER_NIGHT_UNIFORMS` entries (same singleton objects), then `uColor, uStipple, uStippleScale,
+uEmissive, uOpacity`, and finally — only when `options.localGlow` is set —
+`uLocalGlowPosition, uLocalGlowRadius, uLocalGlowStrength`.
+
+GLSL interface (uniform/attribute names+types, `#ifdef` names, `COMMON_GLSL` function
+signatures) is a parity target; shader *text* is not — the clone shaders are written fresh from
+formula tables, and equivalence beyond the interface is judged on rendered GPU output.
+
+| Shader | Uniforms | Attributes | `#ifdef` names |
+|---|---|---|---|
+| `COMMON_GLSL` | the 14 shared uniforms (uLightDir..uHeadlightDirection) | none | none |
+| NPR vertex | `uTime` (TREE_SWAY only) | `topY` (STRATA only) | LOCAL_GLOW, TREE_SWAY, STRATA, USE_INSTANCING, USE_COLOR, USE_INSTANCING_COLOR |
+| NPR fragment | COMMON set + uColor/uStipple/uStippleScale/uEmissive/uOpacity; LOCAL_GLOW adds uLocalGlowPosition/Radius/Strength | none | LOCAL_GLOW, STRATA, DOUBLE_SIDED, FLOWERS, NIGHT_GLOW |
+| Cone vertex / fragment | – / uNight, uLength, uStrength | none | none |
+| Glow vertex / fragment | – / uNight | glowCenter (vec3), glowSize (vec2), glowNormal (vec3), glowStrength (float) | none |
+
+`COMMON_GLSL` function signatures: `hash13(vec3)`, `hash12(vec2)`, `hash11(float)`,
+`vnoise(vec3)`, `shadowAt(vec3,vec3)`, `headlightAt(vec3,vec3)`, `nprShade(vec3,vec3,vec3,float,float)`,
+`applyFog(vec3,vec3)`.
+
+## Night glow sprites and the headlight cone (`src/effects/*`)
+
+Both `createLightCone` and `createLightGlows` build a `ShaderMaterial` named
+`NIGHT_LIGHT_GLOW_MATERIAL_NAME` (`'night-light-glow'`) and spread the same frozen
+`ADDITIVE_GLOW_RENDER_STATE` object (`transparent: true, depthWrite: false, blending: Additive`);
+a later phase's registry collects every mesh whose `material.name` equals that constant once
+after scene composition and toggles visibility on `uNight > 0`. **Both materials are always
+`transparent: true`** — this is load bearing, not incidental: `mergeStaticGeometry` only bakes
+non-transparent meshes, so any downstream builder that accidentally makes a glow or cone material
+opaque would get silently merged into an unrelated static batch.
+
+## Static geometry merge (`src/geometry/merge-static-geometry-by-material.js`)
+
+`mergeStaticGeometry(root, excluded)` walks `root`'s children (the root's own transform is never
+baked) and bakes every eligible mesh (`isMesh`, has a `uv` attribute, `!material.transparent`)
+into one merged `Mesh` per material, appended to `root` in first-seen-material order. Kept quirks:
+
+- Excluded subtrees are neither visited nor `updateMatrix()`ed — their `.matrix` stays stale.
+- Removing a merged source drops its whole subtree, including any non-merged (e.g. transparent)
+  children; emptied groups stay in the tree.
+- Normals are rebuilt from the *original* (untransformed) normal attribute using the plain upper
+  3×3 of the accumulated matrix (`Matrix3.setFromMatrix4`), **not** an inverse-transpose — this
+  matches the NPR vertex shader's `mat3(modelMatrix)` and is deliberate for non-uniformly scaled
+  geometry (e.g. roofs).
+- A mirrored subtree (`determinant(M) < 0`) gets its triangle winding flipped in place.
+- A missing `normal` attribute on an eligible mesh throws (`TypeError`), matching the original merge (unguarded normal read).
+
+## PRNG noise stream A (`src/core/seeded-prng-and-gradient-noise.js`)
+
+Built once at module evaluation from `mulberry32(1337)`: 255 Fisher-Yates draws (building the
+512-entry permutation table), then 256 gradient-angle draws. Independent of `world.rand` (seed
+42, added in P05) and the bird-flock PRNG (seed 7821, added in P13). `fbm` uses lacunarity 2.03
+and a final ×1.6 normalisation; see `code-standards.md`'s "Parity-critical rules" section for the
+three inline-expression substitutions (`wrapAngle`, `positiveModulo`, `exponentialResponse`) that
+later phases may use in place of the equivalent inline formula.
+
+## Parity test infrastructure (this phase)
+
+- `tools/parity/fetch-original-source.mjs`: sha256-pinned, all-or-nothing fetch of the 18
+  original-deployment files into `.parity-cache/original/` (gitignored, vercelignored).
+- `tests/helpers/original-module-loader.mjs`: `originalSkipReason`/`importOriginal` (guarded
+  dynamic import so a missing cache skips cleanly instead of crashing a whole test file) and
+  `extractGlslInterface` (uniform/attribute/`#ifdef`/function-signature extraction for GLSL
+  interface comparisons — never a text comparison).
+
+## Engine module graph (P03)
+
+```
+diorama.js (facade, owns every field) — constructor order:
+  scene+uniforms -> UI state -> clock/motion -> camera-rig state -> scratch/loop
+  -> renderer -> camera -> createOverviewControls -> bindOverviewIntroInterrupt
+  -> createFirstPersonControls
+  -> composeDioramaScene (World, Train, sparks, motion init, sky, puffs, shadow-hidden list, glow registry)
+  -> createShadowDepthPass -> createPostPass
+  -> setTimeOfDay('day', true) -> ResizeObserver + resize() -> loop(now)
+
+frame-loop-scheduler.createFrameLoop(d) -> loop(now), 120fps-capped deadline cadence:
+  d.updateTimeOfDay(realDt) -> d.world.nightAmount = uNight
+  -> [if !paused && timeScale>0] simulation-step.stepSimulation(d, dt*timeScale)
+       (time/uTime -> d.updateTrain -> d.world.update(time, simDt, loco position, motion))
+  -> d.updateCamera(dt) -> d.render() -> performanceStats EMA (alpha 0.1)
+
+render-pipeline.renderDioramaFrame(d):
+  info.reset() -> night-light-glow-registry.applyNightGlowVisibility -> writeHeadlightUniforms
+  -> sky.position = camera.position
+  -> scene.updateMatrixWorld() (once) -> shadowPass.render(...) -> render(scene, camera) -> mainRT
+  -> render(postScene, postCam) -> canvas
+```
+
+**Instance-member dispatch rule.** `frame-loop-scheduler.js` and `simulation-step.js` read every
+member (`updateTimeOfDay`, `updateCamera`, `render`, `world`, `train`, `birds`, ...) from `d`
+inside the frame/step body — never cached, never `.bind`'d, never destructured at
+`createFrameLoop`/module scope. An instance override assigned after construction (the later
+parity-capture no-ops) therefore takes effect on the very next frame with no edit to either file.
+`stepSimulation` is the only function the loop imports directly; it never calls a camera/render/
+palette function itself.
+
+**Singleton uniform binding.** Every `ShaderMaterial` built in this scene (sky, later: npr/water/
+waterfall/glows) spreads `G`/`NIGHT_UNIFORMS`/`SHADER_NIGHT_UNIFORMS` by reference, never a fresh
+`{ value }` wrapper — see the P02 section above. The sky's uniform set is `G` (16 keys, G's own
+order) then `uNight, uHeadlightPosition, uHeadlightDirection` (the `SHADER_NIGHT_UNIFORMS` view);
+the shader itself never reads the headlight pair. Writers: `time-of-day-palettes-and-transition.js`
+(12 palette keys, real unclamped dt, `uLightDir` renormalised every step),
+`custom-shadow-depth-pass.js` (`uShadowMap`/`uShadowTexel` once, `uShadowMatrix` per render),
+`simulation-step.js` (`uTime`).
+
+**Sky dome and post pass** are written fresh from formula tables (independent implementation);
+equivalence is judged on rendered pixels, not shader text. The sky uses the ascending-edge
+`1 - smoothstep(-0.25, -0.02, y)` mist form (mathematically identical to a reversed-edge
+`smoothstep`, avoids GLSL's undefined behaviour for `edge0 > edge1`). The post pass's 4x4 Bayer
+matrix is built recursively from one 2x2 cell (`bayer2(c) = 0.5*c.x + 0.75*c.y - c.x*c.y`,
+`bayer4 = bayer2(inner) + 0.25*bayer2(outer)`), reproducing the standard ordered-dither table.
+
+**Phase 03 render budget** (default overview, clone only, measured via `renderer.info`): 2 draw
+calls, 962 triangles (`SphereGeometry(700,32,16)` = 960 + the post quad = 2), 2 geometries, 4
+textures (shadow RT colour+depth, main RT colour+depth), 2 programs. The shadow pass's override
+program is not compiled yet (nothing opaque is drawn into the scene besides the shadow-hidden
+sky).
+
+**Overview camera.** `OrbitControls` is created at `OVERVIEW_HOME` before its target is set (its
+own constructor calls `update()` once against the default `(0,0,0)` target, which is the source of
+`position0`'s few-ULP float noise after `saveState()`). The 3.2s intro eases with
+`smootherstep` (`p*p*p*(p*(6p-15)+10)`) from a pose 1.22x further out than home. Leaving overview
+back to overview always re-runs a damping-off double reset (`reset()` applied twice): the first
+flushes the still-pending auto-rotate delta, the second lands within float-epsilon of home. The
+intro-interrupt `'start'` listener is bound by `bindOverviewIntroInterrupt(d)` as a separate step
+after `controls` is assigned, keeping the facade's field order `camera, controls,
+onOverviewInteraction, firstPersonControls`.
+
+## Debug menu and parity hook (runtime)
+
+- `ui/debug-menu-panel.js` appends `details#debug-menu` (summary `···` with `title` then
+  `aria-label` `Debug menu`; `.debug-content` > `strong` `Scene debug`, `#debug-layers` with the
+  Trees and Clouds checkbox rows, `pre#debug-performance`) as the last child of `body`. Layer
+  objects are resolved at toggle time from `diorama.world?.treeLayers` and the `group` of each
+  `diorama.world?.clouds` entry, so a world-less Diorama toggles nothing but still logs
+  `[DEBUG] Trees|Clouds: shown|hidden`. The perf readout (labels padded to 13 columns, triangles
+  grouped by the default locale) refreshes on `toggle` and every 500 ms, only while open; a
+  once-only `pagehide` clears the interval. CSS lives in `styles/toast-and-debug-menu.css`.
+- `engine/parity-test-hook.js` `installParityTestHook(d, search)`: no `parity` param → `'off'`,
+  no globals, no output. `?parity` → `window.__parityBuildInfo = {fredokaReadyAtBuild}`, then
+  `window.__diorama = d`, log `[PARITY] Hook installed: live`. `?parity=freeze` → the same plus
+  `d.paused = true` (not persisted, UI state untouched) before the log. It is the only source of
+  `[PARITY]` console output.
+
+## Parity harness (node + browser)
+
+```
+NODE (tests/)                                           BROWSER (tools/parity/)
+original-module-loader → .parity-cache/original          playwright-browser-launcher → full Chromium + clone server :4317
+minimal-dom-shim (recording 2D canvases)                 page-parity-helpers: seed → open ?parity=freeze → ready → freeze
+original-world-stepper (prototype patch + restore)         → shot state → seeded fixed-dt steps → pose → hide → render → rAF×2
+original-simulation-oracle (ctx on Diorama.prototype)    original-site-route-hooks (our hook after the single anchor)
+quantised-number-hashing + scene-graph-signature         dom-shot-page-helpers, parity-shot-list (stages, thresholds)
+  → multiset / ordered compare                           capture → compare (heatmaps, report) → probe (+ post synthetic, checks)
+```
+
+Refined capture recipe (contract recipe plus these determinism fixes): the `updateCamera` and
+`world.updateCloudCamera` no-ops are installed **at freeze time**, before any stepping (the
+stashed originals are what page-side steps call), because the paused loop keeps running real-dt
+camera and cloud code; every shot calls `setMode('overview')` before its own mode so
+`camPos/camTarget` start from the deterministic home pose; `Math.random` is reseeded inside the
+same synchronous evaluate as the stepping; both hooks record `__parityBuildInfo` (Fredoka
+readiness at build time; compare warns on a mismatch, like on `timeAtFreeze`, only once both
+sites build a world). Full detail: `parity-testing-guide.md`.
+
+Instance dispatch verified: the frame loop calls `d.updateTimeOfDay`, `stepSimulation(d, …)`,
+`d.updateCamera` and `d.render` through the instance on every frame, so the freeze overrides take
+effect. `world.nightAmount` and `d.world.updateCloudCamera(d.camera.position, dt)` join the loop
+when the world (nightAmount) and clouds (cloud camera) land; both must keep the same
+instance-lookup form.
+
+## Deferred parity hand-off (sky/post shader pixels) — landed
+
+Both groups below now live in the harness: the four sky-direction shots are in
+`tools/parity/parity-shot-list.mjs` (stage `shell-and-sky`, `reference: null`), and the post
+synthetic-input probe is `tools/parity/post-pass-synthetic-input-probe.mjs`, run by
+`npm run parity:probe` (`--skip-post-probe` to omit). Baseline: all four sky-direction shots max
+channel diff ≤ 1; post probe max diff 0 across 18 combinations. The original specification:
+
+The sky and post shaders are independently written from formula tables, so their pixel parity is
+proven by rendered output, never by comparing shader source. Two capture groups are specified here
+and still need a home in the capture-harness shot list:
+
+- **Sky-direction shots** (clone vs original only, no reference PNG — they pin the independently
+  written sky shader's sun/moon/star/ridge/mist terms by direction, not by the home framing).
+  Camera at `(0, 4, 0)`, looking at `position + 10 * direction`, sky-only hide set:
+
+  | id | time of day | direction |
+  |---|---|---|
+  | sky-sun-day | day | `PALETTES.day.uLightDir` |
+  | sky-moon-night | night | `PALETTES.night.uLightDir` |
+  | sky-stars-night | night | normalize(0, 0.8, −0.6) |
+  | sky-hills-evening | evening | (1, 0, 0) |
+
+  Threshold: meanAbsDiff ≤ 1.0, pixels with any channel diff > 16 ≤ 0.5%.
+
+- **Post synthetic-input oracle probe** (output parity for the independently written post shader).
+  After construction and freeze, on both sites: build a 64×64 RGBA8 colour `DataTexture`
+  (R = 4x, G = 4y, B = 128; Nearest) and a 64×64 float `RedFormat` depth `DataTexture` (0.98 where
+  x < 32 and y < 32, else 0.995; Nearest); point `postMat`'s `tColor`/`tDepth` at them; set `uRes`
+  to (64, 64); keep `uNear`/`uFar` as constructed. For each combination of `uOutline` ∈ {1, 0} ×
+  (`uNight`, `uSaturation`) ∈ {(0, 1), (1, 2.5), (0.5, 1.75)} × (`uPixel`, `uThick`) ∈
+  {(0, 1), (0, 1.8), (1, 1)}: render `postScene`/`postCam` into a 64×64 RGBA8 RT, read back, then
+  restore every uniform/texture. Pass: max per-channel diff clone vs original ≤ 1 per combination.
+
+A review probe against the current shaders passed both groups (sky-direction max diff ≤ 1 per
+shot; post probe max diff 0 across all 18 combinations, with self-diffs up to 136 against a known
+differing variant confirming the probe is sensitive).
+
+## World core (`src/world/`, P05)
+
+```
+World ctor: group, noShadow, N=1200, frames, heights (Float32 201²), bridge, stationS, exclusions,
+  buildingFoundations, windmillBlades (Group), clouds, treeLayers, houseSmoke, stationTravelers,
+  sheepStates, nightAmount, balloon (Group), birdPerches, rand = mulberry32(42)
+  -> runWorldBuildSteps(world, {stopAfter, skip})
+     1 buildTrackFrames  track/track-spline-frames-and-queries   curve, length, frames[0..1200], sx/sz
+     2 findBridge        track/bridge-span-detection            bridge [30, 178]
+     3 buildHeightmap    terrain/terrain-heightmap-grading       graded heights + trackNearestGrid
+     4 buildTrack        track/track-ballast-rails-sleepers      ballast, 2 rails, 383 sleepers
+     5 buildBridge       bridge/*                                deck, girders, rails, 76 posts, arch,
+                                                                 columns, braces, piers, abutments
+     6 buildStation      station/build-station                   station group, building + landing pads,
+                                                                 footpath, 27 exclusions (P06)
+     [7 buildVillage, 8 buildWindmill: later phases, both call flattenBuildingGround]
+     9 buildTerrain      terrain/terrain-skirt-plinth-and-water-height-texture
+                         surface (+ colours, FLOWERS) -> skirt (topY, STRATA) -> plinth -> heightTex
+     [10 createVillageResidents .. 16 buildBirdPerches: later phases]
+```
+
+- **Registry rules.** Steps keep the original method names so the oracle stepper can stop/skip at
+  matching points. Later phases insert only at the slots above: 6–8 between `buildBridge` and
+  `buildTerrain` (terrain must bake after every pad), 10–16 after `buildTerrain`. Unknown `skip`
+  names are ignored (so `WORLD_CORE_SKIP` stays valid as steps land); an unknown `stopAfter`
+  throws `Unknown world build step: <name>`; a skipped stop target still stops.
+- **Builders** are plain `(world, …) => void` functions; `world.js` only initialises fields,
+  runs the registry and wraps the queries. No builder imports `world.js` (no cycles).
+- **Nearest-track cache.** `buildHeightmap` stores `world.trackNearestGrid = {index: Uint16Array,
+  distance: Float64Array}` (201², clone-only field). Pads and the terrain colours read it instead
+  of re-running `nearest()` at the same grid coordinates (`-HALF + i·STEP`, `gridCoordinate`), so
+  outputs are bit-identical; `ensureTrackNearestGrid` builds it lazily when grading was skipped.
+  Distances stay Float64 (pad weights consume the double); the terrain copies them into its own
+  Float32 `trackD` exactly like the reference.
+- **Float32 storage points:** `heights`, `sx`/`sz`, terrain positions (colour inputs are read back
+  from them), `trackD`, normals/colours, skirt positions. Formulas keep the stated operand order,
+  `Math.hypot` vs √Σ choices and `**` vs products (R5); see the phase spec for each recipe.
+- **UUID draws (Math.random stream M).** Every Object3D, BufferGeometry, Material, Texture and
+  Source draws 4 values. The world core creates exactly 56 Object3D (group, windmillBlades,
+  balloon, 53 meshes), 53 geometries, 1 DataTexture + its Source = 111 UUIDs = 444 draws on a warm
+  npr cache (+10 materials cold). No helper Groups, clones or module-scope scene objects; the
+  world is composed before the sky so browser Math.random streams stay aligned.
+- **npr request order** (material ids drive opaque sort ties): ballast, rail, sleeper, red,
+  darkRed, stone, terrain, skirt, wood, trim — option keys/order exactly as the material table.
+- **Child order of `world.group`** (53): ballast, rail −0.52, rail +0.52, sleepers; deck girder;
+  side girder/handrail for s = −1 then +1; posts; ribs −1.15, +1.15; per span i = 1..19 piers or
+  columns (+ brace on even i); abutments sA, sB; terrain, skirt, wood slab, trim slab. Station,
+  village and windmill groups land between the bridge and the terrain.
+- **Performance note.** `POND`/`RIVER` are deliberately unfrozen and the grid passes use flat
+  (not nested) loops: frozen constants in the hot `riverDist` path and nested one-shot loops both
+  sent V8 into deopt loops that made the build slower than the reference. Clone build ≈ 45 ms vs
+  ≈ 55 ms for the reference core in node.
+- **Quirks kept for parity:** the ≈1.09 sleeper seam gap before s = 0, the heightTex half-texel
+  shift + 8-bit quantisation, `heightAt` bilinear vs the mesh diagonal split, the arch in the chord
+  plane (track deviates up to 0.77), the unclamped bridge upper index, `nearest` error up to
+  ≈0.115, asymmetric arch springs.
+
+## Station (`src/world/station/`, P06)
+
+```
+buildStation(world)                                    build step 6 (after buildBridge, before buildTerrain)
+ ├ placeStationSite         station-site-placement      nearest sample to (-45.5, -2) = frame 1008, stationS = distance + 4.5,
+ │                                                       group at p + r·side·2.7, lookAt BEFORE attaching, freeCameraStart, stationSite
+ ├ createStationMaterials   station-palette-materials   platform, edge, wood, darkWood, green, cream, roof (npr request order)
+ ├ platform/edge → shelter → bench                      station-platform-shelter-bench
+ ├ building shell (pad #1) → windows (glows → noShadow[0]) → façade trims → clock
+ ├ mergeStaticGeometry(building, {minute pivot, hour pivot})   9 batches: cream, roof, green, darkWood,
+ │                                                       window, shutterWood, shutterPanel, wood, platform
+ ├ name board → sign (canvas) → [traveler slot] → traveler cases → [grandmother slot] → case stack
+ ├ lamps (3 shared geometries, glows → noShadow[1])
+ ├ stairs (pad #2) → footpath ribbon (26 × r1.8 exclusions, mesh in world.group) → r8 station exclusion
+```
+
+- **Frames and baked extension.** Station group local +z runs along the track, local +x = −r;
+  o = `localOutward` = −side = −1, E = `PLATFORM_EXTENSION` = (2.6 × 1.3) − 2.6 =
+  0.7800000000000002 (computed, never the literal 0.78). Parts on the widened platform use
+  x = (a·o) + o·E (`shiftedX` / `addShiftedBox`); the slab, edge, building and stairs are not
+  shifted; the lamp-halo mesh is moved to x = o·E while its instance centres keep the unshifted x.
+  `freeCameraStart` is taken before any shift. No shift loop runs, and no `world.rand` draw happens.
+- **Order effects.** Pads: graded → building pad (yaw atan2(forward)) → landing pad (yaw =
+  group `rotation.y`) → later houses/windmill → `buildTerrain`. Exclusions start with the 26 path
+  circles, then the r8 disc. `world.noShadow` = [window halos, lamp halos]; `world.group` gains the
+  station group (70 children: 69 meshes + the building) and the path mesh as its last child.
+- **Sign.** 1024×256 canvas drawn synchronously through the global `document` (20 context writes,
+  Fredoka with a sans-serif fallback), `CanvasTexture` with `SRGBColorSpace` and anisotropy 4, on a
+  `MeshBasicMaterial` DoubleSide plane: unlit, so it ignores night, fog and shadows and renders
+  darker than its hex values under disabled colour management (kept for parity). Missing 2D
+  context → throws `Station name canvas context unavailable`.
+- **Clock.** `updateStationClock(world, t)`: minute = (((dir·t)·π)·2)/60, hour =
+  dir·(π/2 + ((t·π)·2)/720), dir = `stationClockDirection` = o. Fresh hands sit at 12:00; t = 0
+  gives 3:00, and the constructor's first 0.05 s step shows ≈3:00 on the first frame.
+- **Per-frame orchestrator.** `World#update(elapsed, dt, trainPosition, trainMotion)` →
+  `updateWorld` (`world-per-frame-update.js`), called by `stepSimulation` right after
+  `time += simDt; uTime = time` (so it freezes with pause or time scale 0). Fixed slot order:
+
+  | Slot | System | Phase |
+  |---|---|---|
+  | 1 | station clock | P06 |
+  | 2–3 | track-sheep FSM + log + speed/direction; pasture flock | P11 |
+  | 4 | station walker update (dt) | P13 |
+  | 5 | village residents update (elapsed, dt) | P09 |
+  | 6 | log resident event, then traveler event | P09/P13 |
+  | 7 | station travelers idle + head-look | P13 |
+  | 8 | chimney smoke | P08 |
+  | 9 | windmill rotor | P08 |
+  | 10–11 | clouds; balloon | P12 |
+
+  `update` assumes a fully built world (no guards); tests call `updateStationClock` on partial worlds.
+- **Error strings added:** `Station name canvas context unavailable`.
+
+## Train (`src/train/`, P07)
+
+```
+new Train()                                            object/material/geometry ids follow this order
+ ├ group, cars, noShadow, chimney, headlight, front/rear scratch vectors
+ ├ createTrainMaterials()  13 materials: 7 npr, cabGlass (MeshBasic), 3 driver npr, 2 raven npr
+ ├ locomotive Group L
+ │  ├ buildLocomotiveBody   shell + glazed cab (3 glass planes → noShadow) → buildDriverAndRaven → cab fittings
+ │  ├ buildLocomotiveFront  door + 10 bolts (1 shared Ico) → buffers → hook/beam → cowcatcher (no uv) → 5 pilot bars
+ │  │                       → 3 lamps → halos (createLightGlows → noShadow) → headlight anchor + cone (→ noShadow)
+ │  ├ createWheelParts()    6 shared geometries (44 wheel groups use them)
+ │  ├ buildLocomotiveWheels per side: 3 drivers, pony, static coupling rod (wheel order = spark round-robin)
+ │  └ chimney anchor (0, 2.9, 1.95)
+ ├ buildTender(m)
+ ├ createCoachMaterials() → createWindowGridTemplate(windowBar)
+ ├ per COACH_COLORS: createCoachBodyMaterial → buildPassengerCoach (grids = template.clone(); 12 halos → noShadow)
+ ├ mergeStaticGeometry(car.obj, wheel groups) per car, only after all six cars exist
+ └ offsets 0 / 4.1 / 8.2 / 13.25 / 18.3 / 23.35 (half lengths + 0.45 gap), cars added to group
+```
+
+- **Ids and UUIDs.** Every object, material and geometry id matches the original's relative to each
+  counter's start (`createLightGlows` allocates the instanced geometry before its template quad, as
+  the original does). The `Math.random` draw total is equal too (9652), but the clone creates all
+  13 train materials up front while the original creates cab glass, driver and raven materials
+  inline, so the UUIDs of the locomotive group, its 3 glass planes (meshes and geometries) and
+  those 6 materials differ; every later node gets the same UUID.
+  UUIDs never reach rendering (program cache keys and render-list sorting use ids and sources).
+- **Part tables.** Builders describe parts as rows `[shape, args, material, x, y, z, extras]`
+  emitted in order by `addParts` (`train-mesh-helpers.js`): a list-valued coordinate emits one
+  part per value with a fresh geometry each; per-side blocks run the whole block for side −1, then
+  +1 (x mirrored as side·x); extras bake a geometry transform, set mesh scale / `rotation.x`, or push
+  onto `noShadow`. Shared geometries (bolt, wheel parts, muntin bars via cloning) are created outside
+  the tables.
+- **Placement.** `update(world, s)`: per car d = s − offset, front/rear = `pointAtS(d ± 0.34·len)`,
+  position = (front + rear)·0.5, `lookAt(front)`, every wheel `rotation.x = d / r`. `s` is never
+  wrapped (`pointAtS` wraps).
+- **Simulation (`Diorama#updateTrain` → `updateTrainAndEffects`).** `stepTrainStationMotion`
+  (pure; cruise 7.5·speedMul, response min(1, 0.9·dt), brake zone 26 with
+  target max(0.35, vmax·√(ahead/26)), snap when the step reaches the stop, 4 s dwell, justLeft
+  cleared only for 30 < ahead < L − 30) → `train.update` → `computeBrakeStrength`
+  (min(1, decel/3) while station braking above 0.1) → `brakeSparks.update` (Math.random ×4 per
+  spark) → `puffPool.update` (Math.random ×7 per puff). The pool owns the puff timer; Diorama
+  exposes it as the `puffTimer` accessor pair and `puffs` is the pool's own record array.
+- **Composition (R9).** world → train → sparks (heightAt bound to the world) → `initTrainMotion`
+  (s = stationS + 1, justLeft, speed 2) → sky → 70 puffs → shadow list [sky, sparks,
+  world.noShadow…, train.noShadow…, puff meshes…] → glow registry (train glows are its last six).
+- **Per frame.** `stepSimulation`: time/uTime → `updateTrain(simDt)` → `world.update(time, simDt,
+  loco position, {distance: s, speed, length: totalLength})` (a fresh record each step).
+  `renderDioramaFrame`: glow visibility → `writeHeadlightUniforms` (anchor world position;
+  normalize(0, −0.08, 1) turned by the locomotive's own quaternion) → sky follow → matrices → passes.
+- **Matrix refresh points.** Sparks refresh the loco world matrix (parents only) before spawning;
+  chimney and headlight positions use `getWorldPosition`. `stepSimulation` allocates no
+  UUID-bearing three objects.
+- **Dispose.** `brakeSparks.dispose()` runs before the glow disposal loop; train and puff
+  geometries/materials are never disposed (kept for parity).
+- **Quirks kept for parity:** static coupling rods while the crank pins turn; static driver and
+  raven; brake-strength spike (capped at 1) when the slider drops mid-brake; dt = 0 while slowing
+  gives strength 1; `puffTimer` drifts negative while standing at speedMul 0; puff emission
+  silently skipped when all 70 are live; `s` never wrapped; the motion record is allocated per
+  step; sparks bounce on the terrain heightmap (≈ trackY − 0.42), not the ballast, and do not
+  inherit the train's velocity.
+
+## Village and windmill (`src/world/village/`, `src/world/windmill/`, P08)
+
+```
+buildVillage(world)                                    build step 7 (after buildStation); first world.rand consumer (W1)
+ ├ createVillagePalette()  cream, 5 roofs, dark, window glass, shutterWood (= the station's), shutterPanel,
+ │                         shutter/panel boxes, jittered puff Ico, smoke, stone, leaves, petals, flower Ico
+ ├ repeat while houses < 8 and tries < 600:  angle = r·π·2, radius = 11 + r·14 (2 draws per try)
+ │    reject (no draws): height ∉ [0.9, 9] → slope_1.5 > 2.2 → nearest-track < 6.5 → Vector2 gap < 5 → excluded(·, 3)
+ │    accept: Group at (x, h, z), lookAt(pond at h) → W, D, H (3 draws) → window glows (→ noShadow)
+ │            → flattenBuildingGround (yaw atan2(pond − site), falloff 2.8) → addHouseShell (roof n mod 5)
+ │            → registerChimneySmoke (1 + 12×5 draws; puffs → noShadow, houseSmoke) → addHouseDoorAndTrim
+ │            → addHouseWindows (shutter index (3n + 2w + (side+1)/2) mod 4) → mergeStaticGeometry(house, every puff so far)
+ │            → world.group.add(house) → footprint → exclusion r2.6
+ ├ < 2 houses → Error 'Village residents require two houses'; villageHomes = first two footprints
+ └ buildVillageShrubs      one InstancedMesh (6 per house, house-local spots, size/tint/yaw by running index, no draws)
+
+buildWindmill(world)                                   build step 8 (W2: always 600 draws)
+ ├ findWindmillSite        300 × (x, z) around (24, −10) ± 8; skip nearest < 8; strictly highest heightAt wins
+ ├ Group at site + (0, −0.3, 0), lookAt(0, y, 30) → pad 3.64², yaw atan2(−x, 30 − z), falloff 3.5
+ ├ materials tower, foundation, roof, sail (double-sided), wood → tower, foundation ring, cap
+ ├ windmillRoofHeight = (group y + cap y) + 0.8 → door, jambs, lintel, plank, knob, 2 steps
+ ├ buildWindmillHayBales   straw, strawEnds, twine; stacks A (3 bales) and B (2), each y = ground − group y − 0.05
+ ├ buildWindmillRotor      world.windmillBlades at (0, 5.4, 1.3): 4 arms (spar, sail) + hub sphere
+ └ world.group.add(windmill) → exclusion r4.5
+```
+
+- **Measured layout.** 8 houses in 256 tries; the world stream stands at draw 1024 after the
+  village and 1624 after the windmill (`windmillRoofHeight` 22.266444503377606). `world.group`
+  gains houses 1–8, the shrub mesh and the windmill (children 51–60), then the 4 terrain meshes.
+  `world.noShadow` grows by 13 per house (glows, then 12 puffs): 106 entries. Exclusions: 27 station
+  → 35 after the houses → 36 with the windmill. buildingFoundations: 2 station pads → 10 → 11.
+- **Merge.** Per house, 9 merged meshes appended in first-encounter material order (cream, roof,
+  shutterWood, dark, flowerPetals, stone, window glass, flowerLeaves, shutterPanel); vent and shutter
+  groups stay behind empty; glows (transparent) and every puff (excluded set) stay separate. The
+  windmill is not merged: 65 meshes.
+- **Order effects.** Shrubs sample heights after every house pad but before the windmill pad; bales
+  after the windmill pad; `buildTerrain` bakes the final heights. Materials and geometries are
+  created lazily inside the build (material ids feed the opaque sort; geometry ids follow allocation).
+- **Per frame.** Slot 8 `updateChimneySmoke(world.houseSmoke, elapsed, dt)`: cycle = elapsed/3.5 +
+  phase, house-local drift/bob/wobble, scale envelope core-smoothstep(0, 0.12) × (1 − smoothstep(0.72,
+  1)), spin += spin·dt; allocation-free. Slot 9 `updateWindmillRotor`: rotation.z −= dt·0.9 (≈ 7 s
+  per turn, clockwise from the front). Both read sim time only, so they freeze with pause / time
+  scale 0.
+- **Render accounting.** Main pass +21·H + 66 draws (9 merged + 12 puffs per house, 1 shrub mesh, 65
+  windmill), shadow pass +9·H + 66 (puffs and glows are noShadow); scale-0 puffs still draw. With
+  H = 8 the clone's frozen default went from 556 to 928 calls (+372).
+- **Error strings added:** `Village residents require two houses`.
+- **Quirks kept for parity:** shrub heights sampled before the windmill pad; puffs are opaque, fade
+  by scale only and drift in each house's own frame; scale-0 puffs still issue draw calls; the
+  windmill is unmerged; shutter angles repeat every 4 houses; hard throw below 2 houses.
+
+### Parity tooling additions (modification-map entries)
+
+- `tools/parity/page-hide-set-application.mjs`: hide set `unbuiltAfterWindmill` (every
+  `world.group` child after the windmill and its 4 terrain meshes, `stationTravelers[].figure`,
+  `d.birds.group`). It runs on both sites; on the clone it hides nothing until those later build
+  steps land, and entries drop out of the comparison automatically as they do.
+- `tools/parity/shot-region-projection.mjs` (new): named regions `village` (houses ∪ shrubs) and
+  `windmill`, projected page-side to CSS px (Box3 corners, 12 px pad, clamped); capture stores
+  `regions` and `devicePixelRatio` in the shot meta; compare crops both PNGs per region
+  (`--region all|none|names`) and judges regional shots on the crops.
+- `tools/parity/village-windmill-runtime-probe.mjs` (new): exact probe fields `houseCount`,
+  `villageHomePositions`, `windmillPosition`, `windmillQuaternion`, `windmillRoofHeight`,
+  `bladeChildCount`, `bladeRotationZ`, `smokeTransforms`, wired into `runtime-counts-probe.mjs`
+  (always compared, also under `--fields`).
+- `tools/parity/parity-shot-factory-and-camera-poses.mjs` (new): `shot()` factory, defaults
+  (incl. `regions: []`) and camera poses split out of `parity-shot-list.mjs`, which gains the stage
+  `village-and-windmill` (now active), its four shots and strict `world-core-*` shots.

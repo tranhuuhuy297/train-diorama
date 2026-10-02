@@ -1,0 +1,95 @@
+# Development roadmap
+
+14 phases, each gated by `npm test && npm run check:lines` and reviewed for parity before the
+next phase starts. Dependencies are listed as the phases whose output a phase reads or extends.
+
+| Phase | Name | Depends on | Status |
+|---|---|---|---|
+| P01 | Scaffold, shell, HUD, settings, loading screen | — | Complete |
+| P02 | Core math/noise, shared materials, geometry helpers | P01 | Complete |
+| P03 | Real `Diorama` engine: render pipeline, cameras, shadow/post passes | P01, P02 | Complete |
+| P04 | Debug menu, parity test harness, browser capture tooling | P01–P03 | Complete |
+| P05 | World: terrain, track, bridge | P02 | Complete |
+| P06 | Station | P05 | Complete |
+| P07 | Train model and motion | P02, P05 | Complete |
+| P08 | Village and windmill | P06, P07 | Complete |
+| P09 | Village residents, trees, rocks | P05, P08 | Pending |
+| P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Pending |
+| P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Pending |
+| P12 | Water, clouds, balloon | P05 | Pending |
+| P13 | Station travellers, birds | P06, P09 | Pending |
+| P14 | Full-scene parity signature, deployment prep | P01–P13 | Pending |
+
+P01 delivers a runnable shell: the loader resolves, the HUD is fully interactive, settings
+persist, and `src/engine/diorama.js` is a facade stub that P03 replaces at the same path without
+changing its public surface.
+
+P02 delivers the pure runtime libraries every scene module depends on: seeded PRNG/noise, the
+shared lighting uniform bag, the NPR cel-shader GLSL + cached factory, the night glow/cone
+effects and the per-material static-geometry merge — plus the original-source oracle fetcher and
+node-side parity harness. Nothing renders in the app yet; the P01 facade still boots unchanged.
+
+P03 replaces the P01 facade with the real engine: `WebGLRenderer`, the 120fps deadline frame
+loop, the three time-of-day palettes and their 3s blend, the procedural sky dome, a custom
+2048² shadow depth pass, the ink/saturation/grain-or-Bayer/vignette post pass, pixel-art render
+resolution, and the overview `OrbitControls` with its dolly-in intro and double reset. World,
+train and birds are not built yet — their constructor/composition/frame-loop insertion slots are
+reserved and documented; P05–P13 fill them by editing this phase's own files at those slots
+(`diorama.js`, `diorama-scene-composition.js`, `frame-loop-scheduler.js`, `simulation-step.js`,
+`render-pipeline.js`, the camera files) without changing the facade's public surface. The app now
+renders the sky and HUD and responds to every shortcut; deterministic sky/post pixel parity
+against the original is deferred to the P04 capture harness.
+
+P04 ships the `···` debug menu and the opt-in `?parity` hook, and builds the parity toolchain
+every later phase proves itself with: the node oracle (original World stepper, simulation oracle,
+scene-graph signatures) and the browser harness (frozen seeded captures of the live original vs
+the clone, pixel compare, runtime probe). Stage `shell-and-sky` is gating and fully green; the
+`train` and `full-scene` shots are listed and become gating as those features land (see
+`parity-testing-guide.md`).
+
+P05 builds the static world core behind an ordered build-step registry (`world-build-steps.js`;
+later phases insert station/village/windmill before `buildTerrain` and the rest after it): the
+closed centripetal track spline (1201 frames, length 276.136), bridge span detection ([30, 178]),
+the graded heightmap with a cached nearest-track grid, rotated building pads, the vertex-coloured
+terrain with meadow flowers, the strata skirt, the wooden plinth, the R8 water height texture,
+ballast/rails/383 sleepers and the red arch bridge. Node parity against the original is
+byte-exact on every output array and query, scene signatures are equal, construction draws the
+same 444 `Math.random` values (UUIDs) on a warm build, and the clone builds ~20 % faster. The
+two `world-core-*` browser shots are report-only until the original's station, house and
+windmill pads exist on the clone too (P06/P08).
+
+P06 adds the Mossbrook station as build step 6: placement on track frame 1008 (stop distance
+236.455), platform, shelter, bench, the merged station building with its prism roof, vents,
+shuttered windows and animated wall clock, the name board with the canvas sign, lamps with night
+halos, luggage, stairs with railings and the footpath ribbon, plus both building pads and the 27
+keep-out circles. The platform extension is baked into each coordinate with the original's exact
+floats. `World#update` and the fixed-slot `updateWorld` orchestrator land with the clock in slot 1,
+driven from `stepSimulation`. Node parity is bit-identical (figures excluded until P13); the two
+station closeup shots are pixel-identical to the original and the station probe matches on both
+sites, including the sign canvas hash.
+
+P07 adds the train: locomotive (boiler, glazed cab, driver and raven, smokebox front, cowcatcher,
+three lamps with halos and the headlight cone), tender and four coaches, built from part tables
+in the original's exact order, merged per car with the wheels left to spin, spaced 0.45 apart
+and placed each step on the chord between two track points. The station-stop motion (cruise
+7.5 × speed slider, √ braking ramp over 26 units, exact snap, 4 s dwell), the 70-puff chimney
+smoke and the 269-streak brake sparks live in `src/train/` behind the Diorama parity surface;
+`stepSimulation` now feeds the world the real locomotive position and motion record, and every
+render writes the headlight uniforms. Node parity is bit-identical: train signature and merged
+buffers, 1000 placements, and 18000 oracle frames (motion, strength, puffs, spark matrices) with
+`Math.random` replayed per side. The seven `train` stage shots are pixel-identical to the
+original and the train-only probe matches on calls and triangles; `ACTIVE_PARITY_STAGE` is now
+`train`.
+
+P08 adds the village and the windmill as build steps 7–8, the first consumers of the seeded world
+stream: up to eight cottages ringed around the pond (eight placed in 256 tries, 1024 draws), each
+with a levelled pad, walls, prism roof in the 5-colour cycle, vents, chimney, door and trim, two
+flower-box windows with angle-cycled shutters and night halos, 12 chimney puffs, and a per-house
+merge into 9 draws; six instanced shrubs per house; then the windmill on the highest clear spot of
+the eastern hill (600 draws), unmerged (65 meshes) with doorway, steps, two hay-bale stacks and the
+4-armed rotor, plus `windmillRoofHeight` for the later cloud layers. `updateWorld` slots 8 (smoke)
+and 9 (rotor) are live. Node parity is bit-identical (stream position, transforms, heights, pads,
+exclusions, shrub buffers, signatures, 600 frames of smoke and rotor); the four regional
+`village-and-windmill` shots and the now-strict `world-core-*` shots are pixel-identical to the
+original, and draw calls/triangles match under the `unbuiltAfterWindmill` hide set.
+`ACTIVE_PARITY_STAGE` is now `village-and-windmill`.

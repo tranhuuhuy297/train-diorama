@@ -1,0 +1,45 @@
+/* Unlayered, loaded last: every rule here is scoped to the night body attribute.
+   Evening keeps the day styling, so it has no rules of its own. */
+
+body[data-time-of-day="night"] #hud-controls {
+  --ui-active: #ef704c;
+  color-scheme: dark;
+  background: #192943eb;
+  border-color: #7189ab66;
+}
+
+/* Unpressed vs pressed control colours under night. */
+body[data-time-of-day="night"] #hud-controls button[aria-pressed="false"] {
+  background: #30425e;
+  color: #e0e7f2;
+}
+body[data-time-of-day="night"] #hud-controls button[aria-pressed="false"]:hover {
+  background: #415778;
+}
+body[data-time-of-day="night"] #hud-controls button[aria-pressed="true"] {
+  color: #251a15;
+}
+
+/* Camera-mode key hint colour follows the same pressed state. */
+body[data-time-of-day="night"] #camera-modes button[aria-pressed="false"] span {
+  color: #aebed4;
+}
+body[data-time-of-day="night"] #camera-modes button[aria-pressed="true"] span {
+  color: #563025;
+}
+
+body[data-time-of-day="night"] #time-of-day {
+  background: #101e3233;
+  border-color: #7189ab66;
+}
+
+body[data-time-of-day="night"] .slider-control,
+body[data-time-of-day="night"] .pixel-select-label {
+  color: #dce5f2;
+}
+
+body[data-time-of-day="night"] .pixel-select-label select {
+  background: #30425e;
+  border-color: #7189ab66;
+  color: #edf2fa;
+}

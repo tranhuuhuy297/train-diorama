@@ -1,0 +1,75 @@
+/* Unlayered: toast floats above the HUD; the debug-menu DOM is mounted at runtime. */
+
+#shortcut-toast {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: 14rem;
+  max-width: min(90vw, 560px);
+  padding: 0.65rem 1rem;
+  border: 1px solid #5a3b2a33;
+  border-radius: 7px;
+  background: #fbf4e2ed;
+  color: #3f2a1f;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px #3f2a1f26;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    bottom 180ms ease;
+}
+#shortcut-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+#shortcut-toast.hud-hidden { bottom: 1.5rem; }
+
+/* Specificity note: .hud-hidden (1,1,0) beats this media rule (1,0,0), so a hidden HUD
+   keeps the toast at 1.5rem even on narrow screens. */
+@media (max-width: 600px) {
+  #shortcut-toast { bottom: 18rem; white-space: normal; }
+}
+
+/* Debug menu: a <details> panel mounted onto <body> once the engine is ready. */
+#debug-menu {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  color: #f4ead2;
+  font: 13px system-ui, sans-serif;
+}
+#debug-menu summary {
+  list-style: none;
+  cursor: pointer;
+  margin-left: auto;
+  width: 32px;
+  text-align: center;
+  border-radius: calc(8px / 3);
+  background: #29382d99;
+  font-size: 22px;
+}
+#debug-menu summary::-webkit-details-marker { display: none; }
+#debug-menu[open] summary { background: #29382d; }
+body.hud-hidden #debug-menu { display: none; }
+
+#debug-menu .debug-content {
+  margin-top: 6px;
+  padding: 16px;
+  border: 1px solid #ffffff30;
+  border-radius: 4px;
+  background: #203028ed;
+  box-shadow: 0 6px 22px #0004;
+}
+#debug-layers label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  cursor: pointer;
+}
+#debug-menu pre { margin: 14px 0 0; font-size: 11px; line-height: 1.7; }

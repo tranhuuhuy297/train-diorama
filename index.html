@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Train Diorama</title>
+<link rel="icon" type="image/svg+xml" href="./assets/clock-favicon.svg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+
+<link rel="stylesheet" href="./styles/base-reset-and-utilities.css">
+<link rel="stylesheet" href="./styles/hud-panel-and-controls.css">
+<link rel="stylesheet" href="./styles/loading-overlay.css">
+<link rel="stylesheet" href="./styles/toast-and-debug-menu.css">
+<link rel="stylesheet" href="./styles/night-theme-overrides.css">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div class="relative h-screen w-screen overflow-hidden bg-[#cfe6f4] select-none" id="app" style="font-family:'Fredoka',system-ui,sans-serif">
+
+  <div class="absolute inset-0" id="scene"></div>
+
+  <div class="pointer-events-none absolute left-5 top-5 max-w-xs" id="hud-top">
+    <button class="pointer-events-auto rounded-xl bg-white/70 px-4 py-2.5 text-sm font-semibold text-[#3f2a1f] shadow backdrop-blur-sm" aria-controls="help" aria-expanded="false" type="button" id="controls-button">Shortcuts</button>
+    <div class="pointer-events-auto mt-3 rounded-xl bg-white/55 px-4 py-2.5 text-xs leading-relaxed text-[#4a3a30] shadow backdrop-blur-sm" hidden id="help">
+      <div class="mb-1 flex items-center justify-between font-semibold">Shortcuts<button class="text-[#c8453a] hover:underline" type="button" id="hide-help">hide</button></div>
+      <dl class="shortcut-list">
+        <dt><kbd>1</kbd></dt><dd>Overview camera</dd>
+        <dt><kbd>2</kbd></dt><dd>Free camera</dd>
+        <dt><kbd>3</kbd></dt><dd>Train camera</dd>
+        <dt><kbd>4</kbd></dt><dd>Bridge camera</dd>
+        <dt><kbd>B</kbd></dt><dd>Bridge camera</dd>
+        <dt><kbd>Drag</kbd></dt><dd>Orbit in Overview</dd>
+        <dt><kbd>Scroll</kbd></dt><dd>Zoom in Overview</dd>
+        <dt><kbd>Click</kbd></dt><dd>Start flying in Free view</dd>
+        <dt><kbd>Mouse + WASD</kbd></dt><dd>Look and move in Free view</dd>
+        <dt><kbd>Shift</kbd></dt><dd>Sprint in Free view</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Release mouse</dd>
+        <dt><kbd>P</kbd></dt><dd>Toggle pixel art</dd>
+        <dt><kbd>O</kbd></dt><dd>Toggle ink lines</dd>
+        <dt><kbd>T</kbd> / <kbd>Shift</kbd>+<kbd>T</kbd></dt><dd>Next / previous time of day</dd>
+        <dt><kbd>Space</kbd></dt><dd>Pause outside Free flight</dd>
+        <dt><kbd>X</kbd></dt><dd>Time scale 0× / 1×</dd>
+        <dt><kbd>H</kbd></dt><dd>Show / hide HUD</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col gap-2.5 rounded-3xl border-2 border-[#5a3b2a]/15 bg-[#fbf4e2]/85 p-3 shadow-xl backdrop-blur-md" id="hud-controls">
+    <div class="flex flex-wrap items-center justify-center gap-1.5" id="camera-modes"></div>
+    <div aria-label="Time of day" role="group" id="time-of-day"></div>
+    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-1">
+      <label class="slider-control" title="Right click to reset"><span>Train speed</span><input aria-label="Train speed" type="range" min="0" max="2.5" step="0.05" value="1" id="speed"></label>
+      <label class="slider-control" title="X · Toggle 0× / 1× · Right click to reset" id="time-scale-control"><span>⏱ Time</span><input aria-label="Time scale" type="range" min="0" max="2" step="0.05" value="1" id="time-scale"><span id="time-scale-value">1×</span></label>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-1" id="display-controls">
+      <div class="flex flex-wrap items-center gap-1.5" id="toggles"></div>
+      <label class="pixel-select-label" title="Right click to reset">Pixel art <select aria-label="Pixel art resolution" id="pixel-resolution"></select></label>
+      <div class="flex items-center" id="outline-toggle"></div>
+    </div>
+  </div>
+
+  <div aria-live="polite" role="status" id="shortcut-toast"></div>
+
+  <div aria-busy="true" id="loading">
+    <div class="load-card">
+      <img class="load-logo" alt="Train Diorama" src="./assets/train-diorama-logo.svg">
+      <div class="load-sub">LOADING</div>
+      <div class="load-bar" aria-label="Loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" role="progressbar"><div class="load-fill"></div></div>
+      <div class="load-row"><span role="status" id="load-phase">LOADING ENGINE</span><span id="load-percent">0%</span></div>
+      <div class="load-hint" id="load-hint">Drag to orbit the valley.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  // The insights endpoint only exists on deployed Vercel hosts, so it is skipped locally.
+  const isLocalHost = ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname);
+  if (!isLocalHost) {
+    const insightsScript = document.createElement('script');
+    insightsScript.src = '/_vercel/insights/script.js';
+    document.body.append(insightsScript);
+  }
+</script>
+<script type="module" src="./src/main-entry.js"></script>
+
+</body>
+</html>

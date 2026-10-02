@@ -1,0 +1,85 @@
+/* Unlayered: specificity here beats any utility from base-reset-and-utilities.css. */
+
+/* Bottom control panel shell and its pressed/focus states. */
+#hud-controls {
+  width: min(96vw, 520px);
+  transition: background-color 0.6s ease, border-color 0.6s ease;
+}
+#hud-controls button[aria-pressed="true"] { background: var(--ui-active); color: white; }
+#hud-controls button:focus-visible { outline: 2px solid var(--ui-active); outline-offset: 2px; }
+#hud-controls .rounded-full { border-radius: calc(14px / 3); }
+
+/* Shortcuts help panel and its key/description grid. */
+#help {
+  width: min(360px, calc(100vw - 40px));
+  max-height: calc(100dvh - 110px);
+  overflow-y: auto;
+}
+.shortcut-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 18px;
+  row-gap: 6px;
+  margin-top: 10px;
+}
+.shortcut-list kbd { font-family: inherit; font-weight: 700; white-space: nowrap; }
+.shortcut-list dd { margin: 0; }
+
+/* Speed / time-scale sliders share a fixed two- or three-column grid. */
+.slider-control {
+  display: grid;
+  grid-template-columns: 66px 128px;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  white-space: nowrap;
+  color: #5a3b2a;
+  font-size: 12px;
+  font-weight: 600;
+}
+.slider-control input { width: 128px; min-width: 0; margin: 0; accent-color: var(--ui-active); }
+#time-scale-control { grid-template-columns: 46px 128px 36px; }
+#time-scale-value { text-align: left; font-variant-numeric: tabular-nums; }
+
+/* Segmented time-of-day group. */
+#time-of-day {
+  display: flex;
+  align-self: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #5a3b2a26;
+  border-radius: 6px;
+  background: #5a3b2a0c;
+}
+#time-of-day button {
+  min-width: 90px;
+  padding: 5px 14px;
+  border-radius: 5px;
+  color: #5a3b2a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms, color 180ms;
+}
+#time-of-day button[aria-pressed="false"]:hover { background: #fff9; }
+#time-of-day button[aria-pressed="true"] { box-shadow: 0 2px 5px #3f2a1f20; }
+
+/* Pixel-art resolution select. */
+.pixel-select-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #5a3b2a;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.pixel-select-label select {
+  appearance: auto;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #5a3b2a33;
+  border-radius: 5px;
+  background: #ffffffb3;
+  color: #3f2a1f;
+  cursor: pointer;
+}
