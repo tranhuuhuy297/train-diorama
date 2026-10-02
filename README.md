@@ -5,6 +5,25 @@ floating low-poly valley with a looping steam train, toon shading and a painterl
 No code or artwork is copied from the original; it is used only as a private behavioural
 reference. The logo and favicon in `assets/` are this repository's own original artwork.
 
+**Live demo:** https://tranhuuhuy297.github.io/train-diorama/ (work in progress)
+
+![Train Diorama: overview, day](docs/images/overview-day.jpg)
+
+| Evening | Night | Pixel art (360p) |
+|---|---|---|
+| ![Evening](docs/images/overview-evening.jpg) | ![Night](docs/images/overview-night.jpg) | ![Pixel art](docs/images/overview-pixel-art.jpg) |
+
+**Status:** terrain, track, bridge, station, village, windmill, steam train, time of day, ink lines and
+pixel art are done. Forest, water and waterfall, clouds, balloon, sheep, birds, station travelers and
+the Free / Train / Bridge cameras are in progress.
+
+## References
+
+- [traindiorama.netlify.app](https://traindiorama.netlify.app/) and
+  [train-diorama.vercel.app](https://train-diorama.vercel.app/): the original Train Diorama scene this
+  project recreates, used as the visual and behavioural reference.
+- This repository is an independent re-implementation and is not affiliated with the original author.
+
 ## Quick start
 
 ```bash
@@ -55,7 +74,7 @@ deployed — `.parity-cache/` is in both `.gitignore` and `.vercelignore`).
 
 ```bash
 npm run parity:fetch                                              # from the live deployment
-npm run parity:fetch -- --from ../plans/260930-train-diorama-clone/research/source  # offline
+npm run parity:fetch -- --from <dir with a local copy of the original files>  # offline
 ```
 
 Fetched files are sha256-checked against a pinned table; `--strict` (the default via the script)

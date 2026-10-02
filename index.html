@@ -87,9 +87,8 @@
 
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  // The insights endpoint only exists on deployed Vercel hosts, so it is skipped locally.
-  const isLocalHost = ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname);
-  if (!isLocalHost) {
+  // The insights endpoint only exists on Vercel deployments; other hosts (local, GitHub Pages) skip it.
+  if (location.hostname.endsWith('.vercel.app')) {
     const insightsScript = document.createElement('script');
     insightsScript.src = '/_vercel/insights/script.js';
     document.body.append(insightsScript);
