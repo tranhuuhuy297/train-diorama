@@ -1,5 +1,56 @@
 # Project changelog
 
+## [0.9.0] - 2026-10-02
+
+feat(world): village residents with their walk cycle, the instanced forest with its canopy height
+grid, and the riverside rocks.
+
+### Added
+
+- `src/life/village/`: `VillageResidents` (woman, bare-chested man and dog on copies of the first
+  two cottage frames; 10 npr materials in a fixed order; per-resident merges of head, each arm, each
+  leg and the body, then dog head, tail and body: 33 meshes), `resolveVillageWalkCycle`
+  (`VILLAGE_WALK_CYCLE_SECONDS` 28: walks [4, 12) and [18, 26)), `createVillageResidentMaterials`,
+  `shape` / `block` / `makeHead` / row emitters, `dressVillageWoman`, `dressVillageMan`,
+  `buildVillageDog`. `update(elapsed, dt)` returns `[VILLAGE] Woman starts walking` /
+  `[VILLAGE] Woman stops in yard` on a change.
+- Build steps 10–12: `createVillageResidents` (plus two r2.2 yard exclusions), `buildTrees`,
+  `buildRocksAndSheep` (rocks only until the sheep flock lands).
+- `src/world/trees/`: `createTreeSpeciesGeometries` (conifer, round, cluster, bush; `TREE_TRUNK_COLOR`),
+  `scatterTrees` (`TREE_SCATTER_ATTEMPTS` 14000, W4 draw order, `TREE_TINTS`, `AUTUMN_TREE_TINT`,
+  `BLOSSOM_TREE_TINT`), `buildTrees` (4 instanced layers, sway material for 0–2, still bush material,
+  pushed into `world.treeLayers`), canopy grid (`CANOPY_CELL_SIZE` 2, `CANOPY_HALF` 70,
+  `CANOPY_GRID_SIZE` 70, `createCanopyHeightGrid`, `stampCanopyHeights`, `treeCanopyHeightAt`).
+- `src/world/rocks/riverside-rock-scatter.js`: `buildRiversideRocks` (`ROCK_CAPACITY` 80,
+  `ROCK_ATTEMPTS` 3000, W5a draw order, no instance colour).
+- `World#treeCanopyHeightAt(x, z, radius)`; `updateWorld` slots 5 (residents update) and 6
+  (resident log line).
+- Tests: `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` (walk-cycle table, canopy
+  grid edges, W4/W5a draw accounting on scripted stub worlds),
+  `tests/unit/parity-forest-residents-shots-actions-and-probe.test.mjs`,
+  `tests/parity/residents-trees-rocks-parity.test.mjs` (clone-only build + 8 log lines at the exact
+  frames; original A/B/C: yards, tree buffers, geometries, materials, canopy grid, 10 000 canopy
+  queries, stream continuation, resident signatures, 60 s of resident poses at fixed and random dt,
+  rock buffers, whole `world.group` signature multiset + ordered, exclusion prefix).
+- Parity tooling: stage `residents-and-forest` with shots `overview-day-settled-masked`,
+  `overview-zoomed-orbited-masked` (new reference 12b), `overview-night-masked`,
+  `village-residents-yard`, `trees-sway-t0`, `trees-sway-t1`, `trees-sway-hold` (all three always
+  `fresh`, so the t0 baseline never shares a page with a parked train), `trees-debug-hidden`; hide set `water` and preset `cloneMissing`; shot page actions
+  (`page-shot-actions.mjs`: `uniformTimeOffset`, `debugLayerOff`, `inPageCameraPose`,
+  `holdPausedFrames`); same-site shot relations and action checks in `parity:compare`
+  (`intra-site-shot-checks.mjs`); probe section `forest` (`forest-residents-runtime-probe.mjs`).
+
+### Changed
+
+- `ACTIVE_PARITY_STAGE` advanced to `residents-and-forest`; `station-free-start-day/-night` moved
+  into it as strict shots (hide `cloneMissing` + `train` + `transient`).
+- Research-capture path helpers moved to `tools/parity/research-capture-paths.mjs` and probe diffing
+  to `tools/parity/probe-result-diffing.mjs` (both re-exported from their old modules) to keep the
+  shot list and the probe under the 200-line budget.
+- Capture metas gain `shotActions`; shots gain `uniformTimeOffset`, `holdPausedFrames`,
+  `debugLayerOff`, `inPageCameraPose` and `relation` (shots with page actions get their own page).
+- Clone frozen default: 1004 calls / 1,657,126 triangles / 360 geometries / 5 textures / 20 programs.
+
 ## [0.8.0] - 2026-10-02
 
 feat(world): village cottages with chimney smoke and shrubs, and the windmill with hay bales and rotor.

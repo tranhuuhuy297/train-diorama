@@ -6,6 +6,8 @@ export const HOME = [-55.522, 62.771, 130.519];
 export const TARGET = [0, 4, 0];
 const ZOOM = 0.95 ** 14.4;
 export const ZOOMED = { position: HOME.map((value, axis) => TARGET[axis] + (value - TARGET[axis]) * ZOOM), target: TARGET };
+// Reference 12b: the zoomed pose after a 200 px orbit drag (logged pose; the orbit target is unchanged).
+export const ZOOMED_ORBITED = { position: [-69.894, 19.728, 15.753], target: TARGET };
 export const LOCO_CHASE = { relativeTo: 'loco', offset: [9, 4.5, 7], lookAt: [0, 1.6, -6] };
 export const BRIDGE_VIEW = { position: [-3, 5.5, 60], target: [0, 8.5, 36], fov: 42 };
 // Sky-direction poses look from the orbit target along a fixed direction (clone vs original only, no reference).
@@ -15,13 +17,16 @@ export const locoView = (position, target) => ({ relativeTo: 'loco', position, t
 const DEFAULTS = Object.freeze({
   viewport: 'desktop', mode: 'overview', timeOfDay: 'day', pixelShortSide: null, outline: true, seconds: 0,
   hide: [], camera: null, actions: [], selectors: null, pad: 16, mask: [], keepToast: false, reportOnly: false, parkTrain: false,
-  regions: [],
+  regions: [], uniformTimeOffset: 0, holdPausedFrames: 0, debugLayerOff: null, inPageCameraPose: null, relation: null,
 });
+
+// Page actions that leave state behind (clock offset, layer switch, camera), so their shots never share a page.
+const PAGE_ACTIONS = ['uniformTimeOffset', 'holdPausedFrames', 'debugLayerOff', 'inPageCameraPose'];
 
 /** Frozen shot record; stepped or scripted shots get their own page load unless `fresh` says otherwise. */
 export function shot(id, stage, kind, reference, settings = {}) {
   const merged = { ...DEFAULTS, ...settings };
-  const fresh = settings.fresh ?? (merged.seconds > 0 || merged.actions.length > 0);
+  const fresh = settings.fresh ?? (merged.seconds > 0 || merged.actions.length > 0 || PAGE_ACTIONS.some(name => merged[name]));
   const thresholdClass = settings.thresholdClass ?? (kind === 'dom' ? 'dom' : 'deterministic');
   return Object.freeze({ id, stage, kind, ...merged, fresh, thresholdClass, reference });
 }

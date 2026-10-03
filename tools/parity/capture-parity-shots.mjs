@@ -13,6 +13,7 @@ import {
 import { setCaptureCss, runDomActions, waitForCssSettled, clipForSelectors } from './dom-shot-page-helpers.mjs';
 import { ACTIVE_PARITY_STAGE, selectShots, expandHideSets } from './parity-shot-list.mjs';
 import { computeShotRegions } from './shot-region-projection.mjs';
+import { applyShotActions } from './page-shot-actions.mjs';
 
 const STEP_SECONDS = 1 / 60;
 const MASK_COLOR = '#ff00ff';
@@ -58,7 +59,7 @@ async function shootPng(page, shot) {
   return page.screenshot({ clip, mask, maskColor: MASK_COLOR, animations: 'disabled' });
 }
 
-// Shot state, reseeded fixed-dt stepping, optional parking, camera pose and hide sets (shared with the probe).
+// Shot state, reseeded fixed-dt stepping, optional parking, camera pose, hide sets and shot actions (shared with the probe).
 export async function prepareShotScene(page, shot) {
   await applyShotState(page, shot);
   const steps = Math.round(shot.seconds * 60);
@@ -66,12 +67,13 @@ export async function prepareShotScene(page, shot) {
   const parkedAt = shot.parkTrain ? await parkTrainAway(page) : null;
   const camera = await applyCameraPose(page, shot.camera);
   const hidden = await applyHideSets(page, expandHideSets(shot.hide));
-  return { steps, simulation, parkedAt, camera, hidden };
+  const shotActions = await applyShotActions(page, shot);
+  return { steps, simulation, parkedAt, camera, hidden, shotActions };
 }
 
 async function captureShot(page, shot, session) {
   const started = Date.now();
-  const { steps, simulation, parkedAt, camera, hidden } = await prepareShotScene(page, shot);
+  const { steps, simulation, parkedAt, camera, hidden, shotActions } = await prepareShotScene(page, shot);
   // Regions in CSS px, from the settled camera (its updater is already a no-op).
   const { regions, devicePixelRatio } = shot.regions.length > 0 ? await computeShotRegions(page, shot.regions) : { regions: [], devicePixelRatio: null };
   const png = await shootPng(page, shot);
@@ -80,7 +82,7 @@ async function captureShot(page, shot, session) {
     id: shot.id, target: session.target, runId: session.runId, url: page.url(), profile: session.profile, executablePath: session.executablePath ?? null,
     viewport: shot.viewport, webglRenderer: freeze.webglRenderer, capabilities: freeze.capabilities,
     pausedAtFreeze: freeze.pausedAtFreeze, timeAtFreeze: freeze.timeAtFreeze, buildInfo: freeze.buildInfo,
-    cloudOffsetMax: freeze.cloudOffsetMax, steps, simulationTime: simulation.time, parkedAt, camera, hidden, regions, devicePixelRatio,
+    cloudOffsetMax: freeze.cloudOffsetMax, steps, simulationTime: simulation.time, parkedAt, camera, hidden, shotActions, regions, devicePixelRatio,
     pageErrors: [...page.parityErrors], parityLogs: page.parityConsole.filter(line => consoleText(line).startsWith('[PARITY]')),
     capturedAt: new Date().toISOString(), durationMs: Date.now() - started,
   };

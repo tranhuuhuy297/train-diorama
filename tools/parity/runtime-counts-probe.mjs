@@ -14,6 +14,10 @@ import { runDebugMenuChecks, runHookExposureChecks } from './hook-and-debug-menu
 import { capturePostSyntheticOutputs, comparePostOutputs } from './post-pass-synthetic-input-probe.mjs';
 import { probeStationState, compareStationAcrossSites } from './station-runtime-probe.mjs';
 import { collectVillageWindmillProbe } from './village-windmill-runtime-probe.mjs';
+import { collectForestResidentsProbe, compareForestResidentsProbe } from './forest-residents-runtime-probe.mjs';
+import { diffTargets } from './probe-result-diffing.mjs';
+
+export { diffProbeResults } from './probe-result-diffing.mjs';
 
 const DEFAULT_STATE = { mode: 'overview', timeOfDay: 'day', pixelShortSide: null, outline: true };
 const consoleText = line => line.slice(line.indexOf(': ') + 2);
@@ -57,32 +61,9 @@ function collectRuntimeCounts() {
   };
 }
 
-const countScene = async page => ({ ...await page.evaluate(collectRuntimeCounts), village: await page.evaluate(collectVillageWindmillProbe) });
-
-export function diffProbeResults(original, clone, path = '') {
-  const comparable = value => value !== null && typeof value === 'object';
-  if (!comparable(original) || !comparable(clone) || Array.isArray(original) !== Array.isArray(clone)) {
-    const equal = original === clone || (Number.isNaN(original) && Number.isNaN(clone));
-    return equal ? [] : [{ path, original, clone }];
-  }
-  const keys = new Set([...Object.keys(original), ...Object.keys(clone)]);
-  return [...keys].flatMap(key => diffProbeResults(original[key], clone[key], path ? `${path}.${key}` : key));
-}
-
-const SKY_ONLY_FIELDS = ['calls', 'triangles'];
-
-function diffTargets(original, clone, fields = null) {
-  const diff = {};
-  for (const scenario of Object.keys(original.scenarios)) {
-    const [a, b] = [original.scenarios[scenario], clone.scenarios[scenario]];
-    if (!b) continue;
-    const compared = fields ?? (scenario === 'sky-only' ? SKY_ONLY_FIELDS : null);
-    diff[scenario] = compared
-      ? [...compared.flatMap(field => diffProbeResults(a.renderer[field], b.renderer[field], `renderer.${field}`)), ...diffProbeResults(a.village, b.village, 'village')]
-      : diffProbeResults(a, b);
-  }
-  return diff;
-}
+const countScene = async page => ({
+  ...await page.evaluate(collectRuntimeCounts), village: await page.evaluate(collectVillageWindmillProbe), forest: await page.evaluate(collectForestResidentsProbe),
+});
 
 // One shot's scene exactly as the capture prepares it, rendered twice, then counted.
 async function probeShot(browser, target, shot) {
@@ -175,6 +156,11 @@ async function main() {
   for (const [scenario, list] of Object.entries(output.diff ?? {})) {
     const village = list.filter(entry => entry.path.startsWith('village')).map(entry => entry.path);
     console.log(`diff ${scenario}: ${list.length} field(s) differ; village ${village.length === 0 ? 'equal' : `differs in ${village.length} (first ${village[0]})`}`);
+  }
+  for (const scenario of Object.keys(output.diff ?? {})) {
+    const forest = compareForestResidentsProbe(output.targets.original.scenarios[scenario].forest, output.targets.clone.scenarios[scenario].forest);
+    console.log(`${forest.pass ? 'PASS' : 'FAIL'} forest ${scenario}: ${forest.pass ? `counts equal, exclusion delta ${forest.exclusionDelta}` : forest.failures.join('; ')}`);
+    if (!forest.pass) failures++;
   }
   if (output.station) {
     const { pass, attempts, differing } = output.station;

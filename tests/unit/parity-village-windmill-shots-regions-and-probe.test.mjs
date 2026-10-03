@@ -31,11 +31,11 @@ const inPage = (d, run, argument) => {
 after(() => { delete globalThis.window; });
 
 describe('village and windmill shots', () => {
-  test('four strict regional shots in the active village-and-windmill stage', () => {
+  test('four strict regional shots in the village-and-windmill stage', () => {
     assert.deepEqual(validateShotList(), []);
-    assert.equal(ACTIVE_PARITY_STAGE, 'village-and-windmill');
+    assert.equal(ACTIVE_PARITY_STAGE, 'residents-and-forest');
     const shots = VILLAGE_IDS.map(id => PARITY_SHOTS.find(shot => shot.id === id));
-    assert.deepEqual(selectShots().map(shot => shot.id).slice(-VILLAGE_IDS.length), VILLAGE_IDS);
+    assert.deepEqual(selectShots({ stage: 'village-and-windmill' }).map(shot => shot.id).slice(-VILLAGE_IDS.length), VILLAGE_IDS);
     for (const shot of shots) {
       assert.deepEqual([shot.stage, shot.reportOnly, shot.seconds, shot.thresholdClass, shot.regions], ['village-and-windmill', false, 3, 'deterministic', [...REGION_NAMES]]);
       assert.deepEqual(expandHideSets(shot.hide), ['unbuiltAfterWindmill', 'puffs', 'sparks']);

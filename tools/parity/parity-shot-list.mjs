@@ -1,14 +1,16 @@
 // Stage-gated browser parity shots, thresholds and hide sets, plus the single resolver for the research
 // captures that live outside the repo (reference PNGs and capture logs).
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { PALETTES } from '../../src/engine/time-of-day-palettes-and-transition.js';
-import { shot, ZOOMED, LOCO_CHASE, BRIDGE_VIEW, lookFromTarget, locoView } from './parity-shot-factory-and-camera-poses.mjs';
+import { shot, ZOOMED, ZOOMED_ORBITED, LOCO_CHASE, BRIDGE_VIEW, lookFromTarget, locoView } from './parity-shot-factory-and-camera-poses.mjs';
 import { REGION_NAMES } from './shot-region-projection.mjs';
+import { IN_PAGE_CAMERA_POSES } from './page-shot-actions.mjs';
+import { resolveResearchDir, researchCapturePath } from './research-capture-paths.mjs';
 
-export const PARITY_STAGES = Object.freeze(['shell-and-sky', 'train', 'village-and-windmill', 'full-scene']);
-export const ACTIVE_PARITY_STAGE = 'village-and-windmill';
+export { resolveResearchDir, researchCapturePath, researchSkipReason } from './research-capture-paths.mjs';
+
+export const PARITY_STAGES = Object.freeze(['shell-and-sky', 'train', 'village-and-windmill', 'residents-and-forest', 'full-scene']);
+export const ACTIVE_PARITY_STAGE = 'residents-and-forest';
 export const CHANNEL_DIFF_THRESHOLD = 16;
 
 export const THRESHOLDS = Object.freeze({
@@ -19,30 +21,16 @@ export const THRESHOLDS = Object.freeze({
 
 // allButWorldCore keeps only the sky and terrain/track/bridge meshes (selected by material in the page).
 export const HIDE_SETS = Object.freeze(['world', 'train', 'birds', 'puffs', 'sparks', 'clouds', 'trees', 'allButWorldCore',
-  'stationFigures', 'sheep', 'balloon', 'villageResidents', 'houseSmoke', 'unbuiltAfterWindmill']);
+  'stationFigures', 'sheep', 'balloon', 'villageResidents', 'houseSmoke', 'unbuiltAfterWindmill', 'water']);
 // Everything that moves or that other build steps add around the station, plus the transients.
 const MOVING_FAMILIES = ['stationFigures', 'train', 'birds', 'trees', 'sheep', 'clouds', 'balloon', 'villageResidents', 'houseSmoke'];
 export const HIDE_PRESETS = Object.freeze({
   skyOnly: Object.freeze(['world', 'train', 'birds', 'puffs', 'sparks']),
   transient: Object.freeze(['puffs', 'sparks']),
   allFamilies: Object.freeze([...MOVING_FAMILIES, 'puffs', 'sparks']),
+  // Systems later build steps add (the clone does not have them yet), hidden alike on both sites.
+  cloneMissing: Object.freeze(['sheep', 'water', 'clouds', 'balloon', 'birds', 'stationFigures']),
 });
-
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const DEFAULT_RESEARCH_DIR = path.join(REPO_ROOT, '..', 'plans', '260930-train-diorama-clone', 'research');
-
-export function resolveResearchDir(env = process.env) {
-  return path.resolve(env.PARITY_RESEARCH_DIR || DEFAULT_RESEARCH_DIR);
-}
-
-export function researchCapturePath(fileName, researchDir = resolveResearchDir()) {
-  return path.join(researchDir, 'captures', fileName);
-}
-
-export function researchSkipReason(researchDir = resolveResearchDir()) {
-  const capturesDir = path.join(researchDir, 'captures');
-  return existsSync(capturesDir) ? false : `research captures not found at ${capturesDir} — set PARITY_RESEARCH_DIR`;
-}
 
 export function findMissingReferences(shots = PARITY_SHOTS, researchDir = resolveResearchDir()) {
   return shots
@@ -57,7 +45,7 @@ const MOVING = { seconds: 6, thresholdClass: 'transient' };
 const CHASE = { camera: LOCO_CHASE, hide: ['world', 'birds', 'transient'], fresh: true };
 // Terrain, track and bridge only, over every building pad.
 const WORLD_CORE = { hide: ['allButWorldCore'] };
-const [SHELL, TRAIN, VILLAGE, FULL] = PARITY_STAGES;
+const [SHELL, TRAIN, VILLAGE, FOREST, FULL] = PARITY_STAGES;
 // Station views (local frame of the station group; the train parked half a loop away on both sites).
 const STATION_CLOSEUP = { camera: { relativeTo: 'station', position: [8, 3.5, -6], target: [-3, 1.5, 0.5] }, hide: ['allFamilies'], parkTrain: true };
 // Train-only views in the locomotive's frame (world and birds hidden; Math.random reseeded right before stepping).
@@ -66,9 +54,12 @@ const TRAIN_ONLY = ['world', 'birds'];
 const BRAKING_FRONT = { seconds: 36, camera: locoView([4.5, 2.6, 6.5], [0, 1.2, 0.5]) };
 // Village and windmill vs an original with every later build step hidden; judged inside both regions.
 const VILLAGE_VIEW = { seconds: 3, hide: ['unbuiltAfterWindmill', 'transient'], regions: [...REGION_NAMES] };
-const STATION_FREE_START = {
-  camera: { relativeTo: 'freeCameraStart', fov: 65 }, hide: ['stationFigures', 'train', 'birds', 'transient'], parkTrain: true, reportOnly: true,
-};
+// Residents, forest and rocks: the full scene with the not-yet-built systems masked on both sites.
+const MASKED = { seconds: 3, hide: ['cloneMissing', 'transient'] };
+// Fresh page each, so the t0 baseline never inherits a parked train from a shared session.
+const SWAY = { hide: MASKED.hide, camera: ZOOMED_ORBITED, uniformTimeOffset: 5, fresh: true };
+// Free-camera start over the station, train parked away; strict once the trees stand on the clone.
+const STATION_FREE_START = { camera: { relativeTo: 'freeCameraStart', fov: 65 }, hide: ['cloneMissing', 'train', 'transient'], parkTrain: true };
 
 export const PARITY_SHOTS = Object.freeze([
   shot('sky-day', SHELL, '3d', '14-overview-day-settled.png', SKY),
@@ -92,8 +83,6 @@ export const PARITY_SHOTS = Object.freeze([
   shot('world-core-bridge', SHELL, '3d', '06b-bridge-camera-later.png', { ...WORLD_CORE, camera: BRIDGE_VIEW }),
   shot('station-trackside-closeup-day', SHELL, '3d', null, STATION_CLOSEUP),
   shot('station-trackside-closeup-night', SHELL, '3d', null, { ...STATION_CLOSEUP, timeOfDay: 'night' }),
-  shot('station-free-start-day', SHELL, '3d', '07-free-camera.png', STATION_FREE_START),
-  shot('station-free-start-night', SHELL, '3d', '17-night-overview-zoomed.png', { ...STATION_FREE_START, timeOfDay: 'night' }),
   shot('train-only-day', TRAIN, '3d', '05-train-camera.png', CHASE),
   shot('train-only-night', TRAIN, '3d', '18-night-train-camera.png', { ...CHASE, timeOfDay: 'night' }),
   shot('train-smoke-day', TRAIN, '3d', '05-train-camera-motion-1.png', { camera: LOCO_CHASE, hide: ['world', 'birds'], seconds: 4, thresholdClass: 'transient' }),
@@ -108,6 +97,17 @@ export const PARITY_SHOTS = Object.freeze([
   shot('village-windmill-zoomed-day', VILLAGE, '3d', '12-overview-zoomed-in.png', { ...VILLAGE_VIEW, camera: ZOOMED }),
   shot('village-windmill-evening', VILLAGE, '3d', '03-overview-evening.png', { ...VILLAGE_VIEW, timeOfDay: 'evening' }),
   shot('village-windmill-zoomed-night', VILLAGE, '3d', '17-night-overview-zoomed.png', { ...VILLAGE_VIEW, camera: ZOOMED, timeOfDay: 'night' }),
+  shot('overview-day-settled-masked', FOREST, '3d', '14-overview-day-settled.png', MASKED),
+  shot('overview-zoomed-orbited-masked', FOREST, '3d', '12b-overview-zoomed-orbited.png', { ...MASKED, camera: ZOOMED_ORBITED }),
+  shot('overview-night-masked', FOREST, '3d', '04-overview-night.png', { ...MASKED, timeOfDay: 'night' }),
+  // 8 s in: the woman is mid-way across her yard.
+  shot('village-residents-yard', FOREST, '3d', null, { ...MASKED, seconds: 8, inPageCameraPose: 'villageResidentYard' }),
+  shot('trees-sway-t0', FOREST, '3d', '12b-overview-zoomed-orbited.png', { ...SWAY, uniformTimeOffset: 0 }),
+  shot('trees-sway-t1', FOREST, '3d', '12b-overview-zoomed-orbited.png', { ...SWAY, relation: { to: 'trees-sway-t0', expect: 'differs', minOverFraction: 0.0005 } }),
+  shot('trees-sway-hold', FOREST, '3d', null, { ...SWAY, holdPausedFrames: 20, relation: { to: 'trees-sway-t1', expect: 'identical' } }),
+  shot('trees-debug-hidden', FOREST, '3d', '14-overview-day-settled.png', { ...MASKED, debugLayerOff: 'Trees' }),
+  shot('station-free-start-day', FOREST, '3d', '07-free-camera.png', STATION_FREE_START),
+  shot('station-free-start-night', FOREST, '3d', '17-night-overview-zoomed.png', { ...STATION_FREE_START, timeOfDay: 'night' }),
   shot('overview-day', FULL, '3d', '14-overview-day-settled.png', SETTLED),
   shot('overview-evening', FULL, '3d', '03-overview-evening.png', { ...SETTLED, timeOfDay: 'evening' }),
   shot('overview-night', FULL, '3d', '04-overview-night.png', { ...SETTLED, timeOfDay: 'night' }),
@@ -167,7 +167,17 @@ function shotErrors(candidate) {
     errors.push(`${candidate.id}: transients visible but only ${candidate.seconds} s stepped`);
   }
   if (candidate.reference !== null && !REFERENCE_NAME.test(candidate.reference)) errors.push(`${candidate.id}: bad reference ${candidate.reference}`);
+  if (candidate.inPageCameraPose && !IN_PAGE_CAMERA_POSES.includes(candidate.inPageCameraPose)) errors.push(`${candidate.id}: unknown in-page pose ${candidate.inPageCameraPose}`);
   return errors;
+}
+
+// Same-site relations: `to` must be another listed shot and `expect` 'differs' (with a pixel floor) or 'identical'.
+function relationErrors(candidate, ids) {
+  const { relation } = candidate;
+  if (!relation) return [];
+  const known = ids.has(relation.to) && relation.to !== candidate.id;
+  const shape = relation.expect === 'identical' || (relation.expect === 'differs' && relation.minOverFraction > 0);
+  return known && shape ? [] : [`${candidate.id}: bad relation ${JSON.stringify(relation)}`];
 }
 
 export function validateShotList(shots = PARITY_SHOTS) {
@@ -178,5 +188,6 @@ export function validateShotList(shots = PARITY_SHOTS) {
     seen.add(candidate.id);
     errors.push(...shotErrors(candidate));
   }
+  for (const candidate of shots) errors.push(...relationErrors(candidate, seen));
   return errors;
 }

@@ -67,7 +67,8 @@ World-core suites:
   child order (equal on both sides, `[0,1,2,4,3,5,6,7,8,9]`), part counts and chord values,
   (g) equal warm UUID draws, (h) build time: 2 warm-ups
   then 7 rounds alternating which side builds first, median clone ≤ median original
-  (`PARITY_SKIP_PERF=1` skips it).
+  (`PARITY_SKIP_PERF=1` skips it; the check is timing-sensitive, so on a loaded machine rerun the
+  file alone or set the flag for full-suite runs).
 Station suites:
 - `tests/unit/station-sign-clock-and-build-counts.test.mjs` (`npm test`, no oracle): the sign's 20
   recorded context writes, clock angles via `updateStationClock` (`Object.is` against the formula,
@@ -180,7 +181,15 @@ Recipe (identical on both sites; every in-page step uses parity-surface names on
    then the shot's mode; palette applied immediately; pixel/outline. Reseed, then step
    `round(seconds·60)` frames at dt 1/60 in one synchronous evaluate (time-of-day, nightAmount,
    time/uTime, train, world, birds, stashed camera + cloud-camera updaters; no render).
-5. Optional camera pose, then hide sets (always after stepping: puff spawns re-show meshes).
+5. Optional camera pose, then hide sets (always after stepping: puff spawns re-show meshes), then
+   the shot's page actions (`page-shot-actions.mjs`, in this order): `uniformTimeOffset` (adds n to
+   `lightingUniforms.uTime` without a sim step), `debugLayerOff` (clicks the `#debug-layers`
+   checkbox whose label matches, which works with the `<details>` closed, and captures the change
+   handler's log line), `inPageCameraPose` (named in-page registry resolved to world-space points,
+   then applied like a `camera`; `villageResidentYard` = home frame of `villageResidents.residents[0]`,
+   camera (−1.5, 2.4, depth/2 + 5.5) → target (0, 0.7, depth/2 + 0.65)), `holdPausedFrames` (waits n
+   animation frames while paused, recording `uTime` before and after). The results go into the meta
+   as `shotActions`.
 6. 3D shots: UI hidden, rendering on, 2 rAFs, full-viewport screenshot. The capture CSS
    (`captureCssText`) hides each UI root and all its descendants with `transition: none
    !important`: a running transition outranks `!important`, so the seven `transition-all` HUD
@@ -190,7 +199,9 @@ Recipe (identical on both sites; every in-page step uses parity-surface names on
 
 Shot schema: `{id, stage, kind '3d'|'dom', viewport, mode, timeOfDay, pixelShortSide, outline,
 seconds, hide, camera, fresh, actions, selectors, pad, mask, keepToast, reportOnly, parkTrain,
-regions, thresholdClass, reference}`. `regions` names screen regions (`village`, `windmill`; see
+regions, uniformTimeOffset, holdPausedFrames, debugLayerOff, inPageCameraPose, relation,
+thresholdClass, reference}`. `relation` = `{to, expect: 'differs', minOverFraction}` or
+`{to, expect: 'identical'}` (same-site check against another shot, see section 5). `regions` names screen regions (`village`, `windmill`; see
 "Regions" below) the shot is judged on. `camera` is `{position, target, fov?}` in world space, or with
 `relativeTo: 'loco' | 'station'` in that object's local frame (station group = parent of the
 clock building, the same lookup on both sites), or `{relativeTo: 'freeCameraStart', fov}` (copies
@@ -199,8 +210,8 @@ after stepping: `train.update(world, (s + L/2) % L)` when both a train and a wor
 the hidden train and so its headlight uniform away from the station; no-op otherwise). `reportOnly` shots are never picked by stage selection (request them with `--shots`)
 and `parity:compare` prints them as `REPORT(PASS|FAIL)` without failing the run.
 `reference` is a bare research capture file name or `null` (clone-vs-original only). Consecutive
-non-fresh shots on one viewport share a page load; fresh shots (`seconds > 0` or actions, or set
-explicitly) get their own.
+non-fresh shots on one viewport share a page load; fresh shots (`seconds > 0`, DOM actions or any
+page action, or set explicitly) get their own.
 
 Hide sets: `world`, `train`, `birds`, `puffs`, `sparks`, `clouds`, `trees`, `stationFigures`
 (`world.stationTravelers[].figure`), `sheep` (`world.sheep`, `sheepLegs`, `sheepEars`), `balloon`,
@@ -213,20 +224,46 @@ resident groups, 8 instanced meshes (4 tree layers, rocks, sheep body/legs/ears)
 and hides nothing on a clone that lacks those steps; as residents/trees/rocks, sheep,
 water/clouds/balloon and the station figures/birds land on the clone they are hidden on both sites
 alike, so drop this set from a shot once its subject should be compared too) and
+`water` (direct `world.group` meshes whose shader has no `uColor` uniform: the water surface and
+the waterfall; 2 on the full original) and
 `allButWorldCore` (every mesh except `d.sky` whose material is neither terrain (`FLOWERS` define)
 nor skirt (`STRATA` define) nor one of the flat world-core signatures `uColor hex|uStipple`:
 `a39a8c|0.5` ballast, `8f8f9e|0.05` rail, `6e4a32|0.25` sleeper, `6b4630|0.12` plinth wood,
 `3f2a1f|0.1` plinth trim, `b8432f|0.12` red, `8a2f24|0.1` dark red, `b9ae98|0.35` stone; on the
 full original it keeps exactly the 53 core children). Presets: `skyOnly`, `transient`,
-`allFamilies` (every family above except `world`/`allButWorldCore`, plus the transients). The in-page
+`allFamilies` (every family above except `world`/`allButWorldCore`, plus the transients) and
+`cloneMissing` (`sheep`, `water`, `clouds`, `balloon`, `birds`, `stationFigures`: the systems later
+build steps add, hidden alike on both sites; on the clone it only touches World init's empty,
+unattached balloon group). The in-page
 function lives in `page-hide-set-application.mjs`; restores run in reverse order so overlapping
 sets give back the original visibility.
 
-Stages: `shell-and-sky` → `train` → `village-and-windmill` → `full-scene`. A shot runs when its
+Stages: `shell-and-sky` → `train` → `village-and-windmill` → `residents-and-forest` → `full-scene`. A shot runs when its
 stage index is ≤ the selected stage; `--shots` overrides gating. To add a shot, append one line in
 `parity-shot-list.mjs` at its stage (the `shot()` factory and the camera poses live in
 `parity-shot-factory-and-camera-poses.mjs`); when a stage's features land, advance
-`ACTIVE_PARITY_STAGE` (now `village-and-windmill`).
+`ACTIVE_PARITY_STAGE` (now `residents-and-forest`).
+
+Residents and forest shots (stage `residents-and-forest`; hide `cloneMissing` + `transient`, so the
+full scene is compared with only the not-yet-built systems masked; deterministic thresholds):
+
+| Shot | Steps | Pose / actions | Reference |
+|---|---|---|---|
+| `overview-day-settled-masked` | 180 | overview home | 14-overview-day-settled |
+| `overview-zoomed-orbited-masked` | 180 | `ZOOMED_ORBITED` (logged 12b pose (−69.894, 19.728, 15.753) → (0, 4, 0)) | 12b-overview-zoomed-orbited |
+| `overview-night-masked` | 180 | overview home, night | 04-overview-night |
+| `village-residents-yard` | 480 (woman mid-walk, cycle ≈ 8.05) | `inPageCameraPose: 'villageResidentYard'` | – |
+| `trees-sway-t0` | 0 | 12b pose, `fresh: true` (own page load, like t1) | 12b-overview-zoomed-orbited |
+| `trees-sway-t1` | 0 | 12b pose, `uniformTimeOffset: 5`; relation differs from t0 (≥ 0.05 %) | 12b-overview-zoomed-orbited |
+| `trees-sway-hold` | 0 | as t1 + `holdPausedFrames: 20`; relation identical to t1 | – |
+| `trees-debug-hidden` | 180 | overview home, `debugLayerOff: 'Trees'` | 14-overview-day-settled |
+
+`station-free-start-day` / `-night` (free-camera start pose, FOV 65, train parked away, hide
+`cloneMissing` + `train` + `transient`; references 07 and 17) moved here from the shell stage and
+are strict now that the trees stand on the clone.
+
+By day `uTime` moves only the tree sway on the clone (local-glow flicker is × uNight = 0; water and
+waterfall are masked or absent), so t1 vs t0 isolates the sway.
 
 Village and windmill shots (stage `village-and-windmill`; 3 s stepped, hide `unbuiltAfterWindmill`
 + `transient`, house smoke visible, regions `village` + `windmill`, deterministic thresholds per
@@ -274,8 +311,13 @@ it is deterministic. The P04 shots `train-only-day`/`-night` (loco chase pose, e
 | transient (puffs/sparks visible) | ≤ 3.0 | ≤ 3 % |
 | dom | ≤ 0.5 | ≤ 0.2 % |
 
-A shot passes when sizes match, both metas have no page errors and both metrics are within its
-class. Regional shots (metas with `regions`) are judged per region instead: both PNGs are cropped
+A shot passes when sizes match, both metas have no page errors, both metrics are within its
+class and its same-site checks hold (`intra-site-shot-checks.mjs`): a `relation` is judged on each
+site between this shot's PNG and the `to` shot's PNG (`differs`: share of pixels with a channel
+diff > 16 ≥ `minOverFraction`; `identical`: max channel diff 0), and recorded shot actions must have
+done their job (`holdPausedFrames`: still paused and `uTimeBefore === uTimeAfter`;
+`debugLayerOff`: unchecked and logged `[DEBUG] <label>: hidden`). Results are in
+`compare-report.json` under `intraSite`. Regional shots (metas with `regions`) are judged per region instead: both PNGs are cropped
 to each region × `devicePixelRatio` (rounded outward, clamped to the image) and every crop must be
 within the class; whole-frame metrics are still printed and stored for information (`[name mean=…]`
 per region on the console, `regions[]` in `compare-report.json`, region outlines in cyan on the
@@ -297,9 +339,10 @@ is our own artwork, so `.load-logo` is masked on both sites; its box is still co
 mobile shots, 05/18/06b/19/07/12/17 → train/full-scene shots, 14/06b → the report-only
 `world-core-overview` (home pose) and `world-core-bridge` (position (−3, 5.5, 60) → (0, 8.5, 36),
 FOV 42; fixed target, since the original's bridge camera follows the train), strict since every
-building pad exists on the clone; 14/12/03/17 → the four `village-windmill-*` shots. Not captured: 02a/02 (time-dependent
+building pad exists on the clone; 14/12/03/17 → the four `village-windmill-*` shots; 14/12b/04 → the masked `residents-and-forest`
+shots (12b through its logged camera pose). Not captured: 02a/02 (time-dependent
 intro, covered by unit tests), 05-motion-2..3 and 06 (mid-blend), 11/11b (overview with the UI
-hidden), 12b (manual orbit drag). The four sky-direction shots (`sky-sun-day`,
+hidden). The four sky-direction shots (`sky-sun-day`,
 `sky-moon-night`, `sky-stars-night`, `sky-hills-evening`) look from (0, 4, 0) along a fixed
 direction and have no reference.
 
@@ -331,6 +374,12 @@ renderer fields; the console prints `village equal` or the first differing path.
 `unbuiltAfterWindmill`: `npm run parity:probe -- --shot village-windmill-overview-day --fields
 calls,triangles`.
 The sky-only diff compares only calls/triangles; default compares everything.
+`forest` (`forest-residents-runtime-probe.mjs`; null without tree layers): `treeCounts`
+(`treeLayers[i].count`), `rockCount` (the instanced mesh after `treeLayers[3]`),
+`residentMeshCount` (meshes under `villageResidents.residents[].home`), `exclusionCount` and
+`hasSheepFlock`. Judged in every scenario as `PASS|FAIL forest <scenario>`: the three counts must be
+equal and the exclusion delta must be −3 per site lacking the flock's three trackside clearings
+(−3 now, 0 once the clone builds the sheep).
 
 Post synthetic-input probe: a 64×64 colour ramp and a two-level float depth texture go through
 each site's post material for 18 combinations of outline × (night, saturation) × (pixel,
@@ -498,3 +547,28 @@ open, `body.hud-hidden`) are identical on both sites.
   while the same shots captured fine on retry and in isolation; the page loads three.js and fonts
   from CDNs, so treat a lone readiness timeout as network and re-run the remaining shots with
   `--target clone --shots …`.
+
+### Residents, trees and rocks (P09, 2026-10-02)
+
+- Node: `npm test` (all unit cases pass) and `npm run test:parity` 45 cases pass. The residents, forest and
+  rocks are bit-identical to the original: the two r2.2 yard exclusions (38 in all), the four tree
+  layers (3749 / 1215 / 932 / 769 instances; autumn 46/36/26 and blossom 18/15/18 on round, cluster
+  and bush) with byte-equal matrix and colour buffers, species geometries, bounding boxes, materials
+  (TREE_SWAY on layers 0–2 only), the canopy grid bytes and 10 000 `treeCanopyHeightAt` queries, the
+  world stream continuing at draw 78587 after the trees, the resident home signatures, 60 s of
+  every resident, dog, head and tail transform at dt 1/60 and at random dt, the 80 rocks with the
+  whole 80-slot matrix buffer, and the whole `world.group` signature after the rock step (multiset
+  and ordered; the original's sheep and station figures excluded). The clone alone logs the eight
+  `[VILLAGE]` lines at frames 241, 720, 1080, 1561, 1921, 2401, 2761, 3241 of 3600.
+- Browser: the eight `residents-and-forest` shots match (mean 0.000, max channel diff ≤ 1);
+  `trees-sway-t1` differs from `trees-sway-t0` on 10.9 % of pixels on both sites, `trees-sway-hold`
+  is identical to `trees-sway-t1` with `uTime` 5.05 before and after the paused hold, and
+  `trees-debug-hidden` hides the four layers and logs `[DEBUG] Trees: hidden` on both sites. The
+  masked original hides 3 sheep meshes, water + waterfall, 33 cloud groups, the balloon, the bird
+  group and 2 station figures. `station-free-start-day/-night`, masked the same way, are now strict
+  and pixel-identical (max 0). The whole active stage (42 strict shots) passes.
+- Probe: forest section `[3749, 1215, 932, 769]` trees, 80 rocks, 33 resident meshes on both
+  sites; exclusions 41 (original) vs 38 (clone), delta −3 as expected. Clone frozen default 1004
+  calls / 1,657,126 triangles / 360 geometries / 5 textures / 20 programs (original 1373 /
+  1,762,696 / 419 / 6 / 25); sky-only equal; station probe equal on the first attempt; post
+  synthetic probe max diff 0.

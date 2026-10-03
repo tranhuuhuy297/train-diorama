@@ -57,7 +57,8 @@ src/core/              seeded PRNG/noise, scalar helpers, colour-management side
 src/materials/         shared lighting uniforms, NPR cel-shader GLSL + factory
 src/effects/           night headlight cone, instanced window/lamp glow sprites
 src/geometry/          per-material static-geometry merge
-src/world/             World: build steps, terrain, track, bridge, station, village, windmill, per-frame update
+src/world/             World: build steps, terrain, track, bridge, station, village, windmill, trees + canopy grid, rocks, per-frame update
+src/life/              animated figures: village residents (woman, man, dog)
 src/train/             train model, station-stop motion, smoke puffs, brake sparks, headlight uniforms
 tools/                 dev server, line-count gate, parity source fetcher, browser parity harness
 tests/unit/            node:test unit + oracle-parity suites

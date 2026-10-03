@@ -104,7 +104,8 @@ their reserved constructor slot in a later phase without changing this file's pu
 - `world/*`: the core (terrain, track, bridge) landed in P05 (see "World core" below); station,
   village, windmill, trees, rocks, water, sky, balloon and perches are added across P06–P13.
 - `train/*`: landed in P07 (see "Train" below).
-- `life/*` (villagers, sheep, station travellers, birds): added across P09–P13.
+- `life/*` (villagers, sheep, station travellers, birds): added across P09–P13; the village
+  residents landed in P09 (see "Village residents, forest and rocks" below).
 
 ## Shared lighting uniform bag (`src/materials/shared-lighting-uniforms.js`)
 
@@ -371,7 +372,10 @@ World ctor: group, noShadow, N=1200, frames, heights (Float32 201²), bridge, st
      [7 buildVillage, 8 buildWindmill: later phases, both call flattenBuildingGround]
      9 buildTerrain      terrain/terrain-skirt-plinth-and-water-height-texture
                          surface (+ colours, FLOWERS) -> skirt (topY, STRATA) -> plinth -> heightTex
-     [10 createVillageResidents .. 16 buildBirdPerches: later phases]
+    10 createVillageResidents  world-build-steps → life/village       residents on the first two homes, yards r2.2 ×2 (P09)
+    11 buildTrees        trees/tree-instanced-layers            4 instanced layers, canopy grid (W4) (P09)
+    12 buildRocksAndSheep world-build-steps → rocks/*           ≤ 80 rocks (W5a); sheep flock appended in P11
+     [13 buildWater .. 16 buildBirdPerches: later phases]
 ```
 
 - **Registry rules.** Steps keep the original method names so the oracle stepper can stop/skip at
@@ -460,7 +464,8 @@ buildStation(world)                                    build step 6 (after build
   | 9 | windmill rotor | P08 |
   | 10–11 | clouds; balloon | P12 |
 
-  `update` assumes a fully built world (no guards); tests call `updateStationClock` on partial worlds.
+  `update` assumes a fully built world; the only guard is slot 5 (`villageResidents?.update(…) ?? null`,
+  the partial-world convention). Tests call `updateStationClock` on partial worlds.
 - **Error strings added:** `Station name canvas context unavailable`.
 
 ## Train (`src/train/`, P07)
@@ -593,3 +598,72 @@ buildWindmill(world)                                   build step 8 (W2: always 
 - `tools/parity/parity-shot-factory-and-camera-poses.mjs` (new): `shot()` factory, defaults
   (incl. `regions: []`) and camera poses split out of `parity-shot-list.mjs`, which gains the stage
   `village-and-windmill` (now active), its four shots and strict `world-core-*` shots.
+
+## Village residents, forest and rocks (`src/life/village/`, `src/world/trees/`, `src/world/rocks/`, P09)
+
+```
+createVillageResidents(world)                          build step 10 (after buildTerrain: final heights; no draws)
+ ├ new VillageResidents(villageHomes, (x, z) => world.heightAt(x, z), world.group)
+ │    materials skin, dark, hair, blouse, dress, apron, shorts, dogCoat, dogCream, collar (npr {color, stipple})
+ │    per home: Group (house position + quaternion) → figure (scale 0.8) → body → makeHead (11 parts)
+ │              → per side: leg Group (shin, shoe), arm Group (rotation.z ±0.12; upper arm, hand)
+ │    dressVillageWoman (frontOffset 0.65, scale.y 0.8·0.7 = 0.5599999999999999, lathe dress, collar puffs,
+ │      puff sleeves, hair locks, apron lathe, belt) → dressVillageMan → buildVillageDog (under the man's home)
+ │    merges: per resident head, arms, legs, body minus {head, arms}; then dogHead, dogTail, dog minus pivots
+ │    update(0, 0)
+ └ yards: home.localToWorld(0, 0, depth/2 + frontOffset) → exclusions {x, z, r: 2.2} (woman, man)
+buildTrees(world)                                      build step 11 (W4)
+ ├ treeCanopyHeights = Float32Array(70²) → createTreeSpeciesGeometries → scatterTrees (14000 attempts)
+ ├ npr sway {vertexColors, stipple .55, stippleScale 2.4, treeSway} then bush {same minus treeSway}
+ └ per species: computeBoundingBox → InstancedMesh(count) → per instance setMatrixAt, setColorAt, stamp
+                → world.group.add → world.treeLayers.push (array from World init, never replaced)
+buildRocksAndSheep(world)                              build step 12 (W5a; W5b sheep follow in P11)
+ └ buildRiversideRocks: Dodecahedron(.6) jitter(.4, 9) '#9d978c', InstancedMesh(80), count = placed
+```
+
+- **Measured layout.** 3749 conifers, 1215 round, 932 cluster, 769 bushes (6665 trees; autumn
+  46/36/26, blossom 18/15/18 on round/cluster/bush), 80 rocks. The world stream stands at draw
+  78587 after the trees and 84673 after the rocks. `world.group` children: terrain/skirt/plinth
+  61–64, home 0 (woman) 65, home 1 (man, dog) 66, tree layers 67–70, rocks 71. Exclusions 36 →
+  38. Canopy grid: 3478 non-zero cells, max 26.08.
+- **Canopy query.** `World#treeCanopyHeightAt(x, z, r)` → max over the cells covering
+  [x ± r] × [z ± r] (low index clamped from below, high from above, so a square off the grid is
+  empty), starting from 0. Stamps use the double-precision instance matrix, padded by 0.6 for the
+  sway, in species-then-push order (Float32 cells).
+- **Per frame.** Slot 5 `villageResidents.update(elapsed, dt)` (walk cycle, ground snap through
+  `home.localToWorld`, heading blend `wrapAngle(θ* − θ)·exponentialResponse(dt, 4)`, stride
+  sin(7t), breathing, head/arm drift, dog head and tail); slot 6 logs its event. Tree sway is the
+  existing `TREE_SWAY` vertex block on `G.uTime` (sim time), so it freezes with pause; the shadow
+  override material has no sway.
+- **Render accounting.** Main pass +38 draws (33 resident meshes, 4 tree layers, rocks), shadow
+  pass +38; the clone's frozen default went from 928 to 1004 calls, 326,946 to 1,657,126 triangles,
+  322 to 360 geometries, 17 to 20 programs.
+- **Quirks kept for parity:** both residents turn from 0 to 0.2 rad in the first seconds (the man
+  visibly at load); rocks and trees ignore each other; the canopy grid includes bushes and the 0.6
+  pad; `treeCanopyHeightAt` returns 0 (not ground height) where there are no trees and off the
+  grid; instance tints colour trunks too; rocks may sit partly below the water plane; the woman's
+  non-uniform scale is shaded with `mat3(modelMatrix)` normals; `home.localToWorld` runs every
+  frame on static homes; the sheep clearings are added after the trees; tree shadows do not sway.
+
+### Parity tooling additions (modification-map entries)
+
+- `tools/parity/page-shot-actions.mjs` (new, split from `page-parity-helpers.mjs` for the line
+  budget): optional shot fields applied after stepping, parking, camera pose and hide sets:
+  `uniformTimeOffset` (adds to `uTime` without a sim step), `debugLayerOff` (clicks the
+  `#debug-layers` checkbox by label and captures its log line), `inPageCameraPose` (named in-page
+  registry; `villageResidentYard` = woman's home frame, camera (−1.5, 2.4, depth/2 + 5.5), target
+  (0, 0.7, depth/2 + 0.65)), `holdPausedFrames` (waits n frames paused, records uTime before/after).
+  Results go into the capture meta as `shotActions`.
+- `tools/parity/intra-site-shot-checks.mjs` (new): shot `relation` {to, expect 'differs' with
+  `minOverFraction` | 'identical'} judged per site by `parity:compare`, plus checks of the recorded
+  shot actions (paused hold kept uTime, layer switch hid and logged).
+- `tools/parity/page-hide-set-application.mjs`: family `water` (direct `world.group` meshes whose
+  shader has no `uColor`: water surface and waterfall); `parity-shot-list.mjs` preset
+  `cloneMissing` = sheep, water, clouds, balloon, birds, station figures; stage
+  `residents-and-forest` (now active) with eight new shots plus the two `station-free-start-*`
+  shots, now strict under the same mask; research paths moved to
+  `research-capture-paths.mjs`.
+- `tools/parity/forest-residents-runtime-probe.mjs` (new): probe section `forest` (`treeCounts`,
+  `rockCount`, `residentMeshCount`, `exclusionCount`, `hasSheepFlock`) with the rule "counts equal,
+  exclusion delta −3 while only the original has the flock"; probe diffing moved to
+  `probe-result-diffing.mjs`.

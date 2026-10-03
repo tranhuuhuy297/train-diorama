@@ -13,7 +13,7 @@ next phase starts. Dependencies are listed as the phases whose output a phase re
 | P06 | Station | P05 | Complete |
 | P07 | Train model and motion | P02, P05 | Complete |
 | P08 | Village and windmill | P06, P07 | Complete |
-| P09 | Village residents, trees, rocks | P05, P08 | Pending |
+| P09 | Village residents, trees, rocks | P05, P08 | Complete |
 | P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Pending |
 | P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Pending |
 | P12 | Water, clouds, balloon | P05 | Pending |
@@ -93,3 +93,19 @@ exclusions, shrub buffers, signatures, 600 frames of smoke and rotor); the four 
 `village-and-windmill` shots and the now-strict `world-core-*` shots are pixel-identical to the
 original, and draw calls/triangles match under the `unbuiltAfterWindmill` hide set.
 `ACTIVE_PARITY_STAGE` is now `village-and-windmill`.
+
+P09 adds build steps 10–12 after the terrain bake. The village residents stand on copies of the
+first two cottage frames: the woman (shorter, in a lathe dress with apron) paces her yard on a 28 s
+loop, the bare-chested man idles with his dog, and their two yards become r2.2 keep-out circles.
+The forest scatters 14000 candidate spots (W4) into 3749 conifers, 1215 round trees, 932 clusters
+and 769 bushes (108 autumn and 51 blossom accents), drawn as four instanced layers that sway in the
+vertex shader, and stamps every instance into a 70×70 canopy height grid behind
+`World#treeCanopyHeightAt` (for the fly-along camera and the birds). Eighty riverside rocks (W5a)
+follow. `updateWorld` slots 5–6 are live. Node parity is bit-identical (tree and rock buffers,
+canopy grid and 10 000 queries, stream continuation, resident signatures and 60 s of resident
+poses, whole `world.group` signature); the eight `residents-and-forest` shots (the full scene with
+the not-yet-built systems masked on both sites, plus the two free-camera station starts, now
+strict) match the original (mean diff 0.000, max channel
+diff ≤ 1), sway animates
+and freezes while paused on both sites, and the probe's tree, rock and resident counts match.
+`ACTIVE_PARITY_STAGE` is now `residents-and-forest`.

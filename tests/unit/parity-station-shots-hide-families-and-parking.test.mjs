@@ -36,14 +36,14 @@ describe('station shots', () => {
     assert.deepEqual(CLOSEUPS.map(id => shotById(id).timeOfDay), ['day', 'night']);
   });
 
-  test('free-camera starts are report-only, by id only, with their research references', () => {
-    const stage = selectShots({ stage: 'full-scene' }).map(shot => shot.id);
+  test('free-camera starts are strict forest-stage shots with the unbuilt systems masked', () => {
+    const stage = selectShots({ stage: 'residents-and-forest' }).map(shot => shot.id);
     for (const id of FREE_STARTS) {
       const shot = shotById(id);
-      assert.ok(!stage.includes(id));
-      assert.deepEqual([shot.reportOnly, shot.parkTrain], [true, true]);
+      assert.ok(stage.includes(id) && !selectShots({ stage: 'village-and-windmill' }).some(earlier => earlier.id === id));
+      assert.deepEqual([shot.stage, shot.reportOnly, shot.parkTrain], ['residents-and-forest', false, true]);
       assert.deepEqual(shot.camera, { relativeTo: 'freeCameraStart', fov: 65 });
-      assert.deepEqual(expandHideSets(shot.hide), ['stationFigures', 'train', 'birds', 'puffs', 'sparks']);
+      assert.deepEqual(expandHideSets(shot.hide), ['sheep', 'water', 'clouds', 'balloon', 'birds', 'stationFigures', 'train', 'puffs', 'sparks']);
     }
     assert.deepEqual(FREE_STARTS.map(id => shotById(id).reference), ['07-free-camera.png', '17-night-overview-zoomed.png']);
   });

@@ -2,6 +2,7 @@
 // buildHeightmap, buildTrack, buildBridge, buildStation, buildVillage, buildWindmill, buildTerrain,
 // createVillageResidents, buildTrees, buildRocksAndSheep, buildWater, buildClouds, buildBalloon,
 // buildBirdPerches. Placement draws from world.rand in this order, so never reorder.
+import * as THREE from 'three';
 import { buildTrackFrames } from './track/track-spline-frames-and-queries.js';
 import { findBridge } from './track/bridge-span-detection.js';
 import { buildHeightmap } from './terrain/terrain-heightmap-grading.js';
@@ -11,6 +12,28 @@ import { buildStation } from './station/build-station.js';
 import { buildVillage } from './village/village-house-placement.js';
 import { buildWindmill } from './windmill/windmill-site-and-body.js';
 import { buildTerrain } from './terrain/terrain-skirt-plinth-and-water-height-texture.js';
+import { buildTrees } from './trees/tree-instanced-layers.js';
+import { buildRiversideRocks } from './rocks/riverside-rock-scatter.js';
+import { VillageResidents } from '../life/village/village-residents.js';
+
+// Keep-out radius around each resident's yard, read by the tree and rock scatters.
+const YARD_CLEARANCE = 2.2;
+
+// Residents stand on the final ground, so they come after the terrain bake; their yards are fenced off.
+function createVillageResidents(world) {
+  world.villageResidents = new VillageResidents(world.villageHomes, (x, z) => world.heightAt(x, z), world.group);
+  for (const resident of world.villageResidents.residents) {
+    // Yard centre: on the house axis, the resident's standing distance in front of the facade.
+    const yard = new THREE.Vector3(0, 0, resident.depth / 2 + resident.frontOffset);
+    resident.home.localToWorld(yard);
+    world.exclusions.push({ x: yard.x, z: yard.z, r: YARD_CLEARANCE });
+  }
+}
+
+// Rocks now; the sheep flock joins this step later and continues the same random stream.
+function buildRocksAndSheep(world) {
+  buildRiversideRocks(world);
+}
 
 export const WORLD_BUILD_STEPS = Object.freeze([
   { name: 'buildTrackFrames', run: buildTrackFrames },
@@ -23,6 +46,9 @@ export const WORLD_BUILD_STEPS = Object.freeze([
   { name: 'buildWindmill', run: buildWindmill },
   // Terrain bakes the mesh and height texture last, after every building pad.
   { name: 'buildTerrain', run: buildTerrain },
+  { name: 'createVillageResidents', run: createVillageResidents },
+  { name: 'buildTrees', run: buildTrees },
+  { name: 'buildRocksAndSheep', run: buildRocksAndSheep },
 ].map(step => Object.freeze(step)));
 
 /** Runs the steps in order; `skip` and `stopAfter` exist for partial builds in tests. */

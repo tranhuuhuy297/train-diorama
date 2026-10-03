@@ -39,6 +39,8 @@ export function applyHideSetsInPage({ requested, worldCoreKeys }) {
       return [...(residents?.residents ?? []).map(resident => resident.figure), residents?.dog];
     },
     houseSmoke: () => (d.world?.houseSmoke ?? []).map(puff => puff.mesh),
+    // Water surface and waterfall: the only direct world.group meshes whose shader has no flat-colour uniform.
+    water: () => (d.world?.group.children ?? []).filter(child => child.isMesh && child.material?.uniforms && !child.material.uniforms.uColor),
     // What a world built only up to the windmill (plus its terrain) lacks: every world.group child after
     // the windmill and the 4 terrain meshes that follow it, the station figures and the bird flocks.
     unbuiltAfterWindmill: () => {

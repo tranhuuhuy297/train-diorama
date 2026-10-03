@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { launchParityBrowser } from './playwright-browser-launcher.mjs';
 import { CHANNEL_DIFF_THRESHOLD, THRESHOLDS, PARITY_SHOTS, researchSkipReason, researchCapturePath } from './parity-shot-list.mjs';
 import { toDeviceRegion, selectRegions } from './shot-region-projection.mjs';
+import { runIntraSiteChecks } from './intra-site-shot-checks.mjs';
 
 // Self-contained on purpose: its source is injected into the page so node and page share one implementation.
 export function computeDiffMetrics(a, b, width, height, channelThreshold = 16) {
@@ -130,9 +131,16 @@ async function compareOne(page, inDir, id, regionRequest = 'all') {
   result.regions = outcome.regionMetrics.map(crop => ({ ...crop, pass: evaluateThresholds(crop.metrics, thresholdClass).pass }));
   const errors = [...(metaA.pageErrors ?? []), ...(metaB.pageErrors ?? [])];
   const pass = result.regions.length > 0 ? result.regions.every(crop => crop.pass) : evaluateThresholds(outcome.metrics, thresholdClass).pass;
-  result.pass = pass && errors.length === 0;
+  const readPng = async (target, shotId) => {
+    const file = path.join(inDir, 'shots', target, `${shotId}.png`);
+    return existsSync(file) ? { png: await readFile(file), meta: await readMeta(file.replace(/\.png$/, '.json')) } : null;
+  };
+  const measure = async (a, b) => (await page.evaluate(diffInPage, { originalUrl: dataUrl(a), cloneUrl: dataUrl(b), threshold: CHANNEL_DIFF_THRESHOLD, regions: [], devicePixelRatio: 1 })).metrics;
+  result.intraSite = await runIntraSiteChecks({ shot, metas: { original: metaA, clone: metaB }, readPng, measure });
+  result.pass = pass && errors.length === 0 && result.intraSite.pass;
   if (errors.length > 0) result.reason = `page errors: ${errors.join(' | ')}`;
   else if (!pass) result.reason = 'over threshold';
+  else if (!result.intraSite.pass) result.reason = result.intraSite.failures.join('; ');
   return result;
 }
 

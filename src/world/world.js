@@ -10,6 +10,7 @@ import { nearest, pointAtS, tangentAtS } from './track/track-spline-frames-and-q
 import { inBridge } from './track/bridge-span-detection.js';
 import { GRID_WIDTH, heightAt } from './terrain/terrain-heightmap-grading.js';
 import { flattenBuildingGround } from './terrain/building-ground-flattening.js';
+import { treeCanopyHeightAt as queryTreeCanopyHeight } from './trees/tree-canopy-height-grid.js';
 import { updateWorld } from './world-per-frame-update.js';
 
 export { SIZE, HALF };
@@ -68,6 +69,11 @@ export class World {
 
   flattenBuildingGround(pad) {
     flattenBuildingGround(this, pad);
+  }
+
+  /** Highest stamped canopy top over the square of half-size `radius` around (x, z); 0 where no tree stands. */
+  treeCanopyHeightAt(x, z, radius) {
+    return queryTreeCanopyHeight(this, x, z, radius);
   }
 
   /** One simulation step of every animated world system; only valid on a fully built world. */

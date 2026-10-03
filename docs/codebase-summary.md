@@ -1,11 +1,12 @@
 # Codebase summary
 
-Tree reflects the repository through phase 8 (scaffold/shell/HUD, core noise/materials/
+Tree reflects the repository through phase 9 (scaffold/shell/HUD, core noise/materials/
 effects/geometry, the real engine: renderer, frame loop, palettes, sky, shadow/post, pixel
 art, overview camera; then the debug menu, the parity hook and the node + browser parity harness;
 then the world core: build-step registry, terrain, track and bridge; then the Mossbrook station,
 its wall clock and the world per-frame orchestrator; then the train; then the village cottages,
-chimney smoke, shrubs and the windmill). Later phases append rows; they do not rewrite earlier phases' sections.
+chimney smoke, shrubs and the windmill; then the village residents, the forest with its canopy
+height grid and the riverside rocks). Later phases append rows; they do not rewrite earlier phases' sections.
 
 ```
 train-diorama/
@@ -71,6 +72,12 @@ train-diorama/
 │   │   ├── procedural-geometry-helpers.js        box, colorize, tintGeometry (bird variant), jitter
 │   │   ├── extrude-profile-along-frames.js       extrude(frames, profile, caps)
 │   │   └── building-wall-and-roof-vents.js       addWallVent, addRoofVent
+│   ├── life/
+│   │   └── village/
+│   │       ├── village-resident-materials-and-primitives.js 10 resident materials, shape/block parts, row emitters, makeHead
+│   │       ├── village-woman-and-man-outfits.js         dressVillageWoman (lathe dress, apron, belt, sleeves, locks), dressVillageMan
+│   │       ├── village-dog-builder.js                   buildVillageDog: body, head + tail pivots, collar (build program, no merges)
+│   │       └── village-residents.js                     VillageResidents (homes, merges, update slot 5), resolveVillageWalkCycle (28 s)
 │   ├── train/
 │   │   ├── train.js                              class Train: builder order, per-car merge, offsets, totalLength, update(world, s)
 │   │   ├── train-palette-materials.js            13 loco/crew npr + cab glass, coach cream/gray/windowBar, COACH_COLORS
@@ -86,10 +93,10 @@ train-diorama/
 │   │   ├── locomotive-smoke-puff-pool.js         LocomotiveSmokePuffPool (70 puffs), puffEmissionInterval
 │   │   └── train-frame-update.js                 updateTrainAndEffects, writeHeadlightUniforms
 │   └── world/
-│       ├── world.js                              class World: field init, rand = mulberry32(42), build steps, queries
+│       ├── world.js                              class World: field init, rand = mulberry32(42), build steps, queries, treeCanopyHeightAt
 │       ├── world-constants.js                    SIZE, HALF, SEG, STEP, BOTTOM, UP, RIGHT, POND, RIVER, track points
-│       ├── world-build-steps.js                  WORLD_BUILD_STEPS registry + runWorldBuildSteps({stopAfter, skip})
-│       ├── world-per-frame-update.js             updateWorld: fixed slot order (1 station clock, 8 chimney smoke, 9 windmill rotor)
+│       ├── world-build-steps.js                  WORLD_BUILD_STEPS registry + runWorldBuildSteps; createVillageResidents (yards r2.2), buildRocksAndSheep
+│       ├── world-per-frame-update.js             updateWorld: fixed slot order (1 clock, 5–6 residents + log, 8 smoke, 9 rotor)
 │       ├── terrain/
 │       │   ├── river-distance-and-natural-height.js           segDist, riverDist, naturalHeight
 │       │   ├── terrain-heightmap-grading.js                   buildHeightmap, nearest-track grid cache, heightAt
@@ -122,6 +129,13 @@ train-diorama/
 │       │   ├── village-house-windows-and-shutters.js          SHUTTER_ANGLES, shutterAngleIndex, window glows, windows + shutters
 │       │   ├── village-chimney-smoke.js                       registerChimneySmoke (61 draws), updateChimneySmoke (slot 8)
 │       │   └── village-shrubs-instanced.js                    SHRUB_COLORS, buildVillageShrubs (6 per house, no draws)
+│       ├── trees/
+│       │   ├── tree-species-geometries.js                     TREE_TRUNK_COLOR, createTreeSpeciesGeometries (conifer, round, cluster, bush)
+│       │   ├── tree-scatter-rules.js                          scatterTrees: 14000 attempts (W4 draws), tints, autumn/blossom accents
+│       │   ├── tree-instanced-layers.js                       buildTrees: canopy grid, sway/bush materials, 4 layers → treeLayers
+│       │   └── tree-canopy-height-grid.js                     70×70 Float32 grid: stampCanopyHeights, treeCanopyHeightAt
+│       ├── rocks/
+│       │   └── riverside-rock-scatter.js                      buildRiversideRocks: ≤ 80 instanced dodecahedra (W5a draws)
 │       └── windmill/
 │           ├── windmill-site-and-body.js                      findWindmillSite (600 draws), buildWindmill, windmillRoofHeight, r4.5 exclusion
 │           ├── windmill-hay-bales.js                          HAY_BALE_STACKS, 2 stacks / 5 bales on the levelled ground
@@ -134,15 +148,20 @@ train-diorama/
 │       ├── playwright-browser-launcher.mjs      launch profiles, viewports, full-Chromium path, clone server
 │       ├── original-site-route-hooks.mjs        anchor patch of the original's entry module (test browser only)
 │       ├── page-parity-helpers.mjs              seeded Math.random, freeze, shot state, fixed-dt steps, pose (loco/station/free start), parkTrainAway
-│       ├── page-hide-set-application.mjs        in-page hide sets incl. allButWorldCore, the station-era families, unbuiltAfterWindmill
+│       ├── page-shot-actions.mjs                shot page actions: uniformTimeOffset, debugLayerOff, inPageCameraPose (named), holdPausedFrames
+│       ├── page-hide-set-application.mjs        in-page hide sets incl. allButWorldCore, the station-era families, unbuiltAfterWindmill, water
 │       ├── dom-shot-page-helpers.mjs            capture CSS, DOM actions (reshowLoader), settle, clip
-│       ├── parity-shot-list.mjs                 stages, thresholds, hide sets, shots, research-dir resolver
+│       ├── parity-shot-list.mjs                 stages, thresholds, hide sets/presets, shots, validation (relations, in-page poses)
+│       ├── research-capture-paths.mjs           research-dir resolver, capture paths, skip reason
 │       ├── parity-shot-factory-and-camera-poses.mjs shot() record factory + defaults, home/zoomed/chase/bridge poses
 │       ├── shot-region-projection.mjs           named regions (village, windmill): page-side projection, device crops, selection
 │       ├── capture-parity-shots.mjs             CLI parity:capture (sessions, PNG + meta incl. regions), prepareShotScene
 │       ├── compare-parity-shots.mjs             CLI parity:compare (metrics, per-region crops, heatmaps, meta warnings, report)
+│       ├── intra-site-shot-checks.mjs           same-site relations (differs/identical) and shot-action result checks
 │       ├── runtime-counts-probe.mjs             CLI parity:probe (renderer.info, world fields, village, station, diff; --shot, --fields)
 │       ├── village-windmill-runtime-probe.mjs   exact village/windmill probe fields (homes, windmill transform, rotor, smoke)
+│       ├── forest-residents-runtime-probe.mjs   tree/rock/resident counts, exclusion count + expected sheep-clearing delta
+│       ├── probe-result-diffing.mjs             diffProbeResults, per-scenario diffTargets
 │       ├── station-runtime-probe.mjs            station probe section, sign hash, frozen + live clock checks, font-race reload
 │       ├── post-pass-synthetic-input-probe.mjs  post material outputs on synthetic inputs, cross-site diff
 │       └── hook-and-debug-menu-browser-checks.mjs debug-menu + hook exposure checks, live station clock check
@@ -187,14 +206,17 @@ train-diorama/
 │   │   ├── parity-station-shots-hide-families-and-parking.test.mjs station shots, hide families, parkTrainAway, camera frames
 │   │   ├── parity-capture-css-hides-ui-without-transitions.test.mjs captureCssText: UI roots + descendants, transitions off
 │   │   ├── village-and-windmill-build-logic.test.mjs     shutter cycle, smoke formula, rotor, shrubs, village guard, site search, windmill structure
-│   │   └── parity-village-windmill-shots-regions-and-probe.test.mjs village shots, unbuiltAfterWindmill, regions + crops, probe section
+│   │   ├── parity-village-windmill-shots-regions-and-probe.test.mjs village shots, unbuiltAfterWindmill, regions + crops, probe section
+│   │   ├── village-walk-cycle-and-tree-rock-scatter.test.mjs walk-cycle table, canopy grid edges, W4/W5a draw accounting (stub worlds)
+│   │   └── parity-forest-residents-shots-actions-and-probe.test.mjs forest shots, water/cloneMissing, page actions, forest probe, relations
 │   └── parity/
 │       ├── harness-self-check.test.mjs                  cache-gated original World/stepper/oracle checks (npm run test:parity)
 │       ├── terrain-track-bridge-parity.test.mjs         world core vs original: bytes, queries, signatures (multiset + ordered), material request order, draws, build time
 │       ├── station-parity.test.mjs                      station vs original: placement, pads, exclusions, signatures, child order, sign, clock, baked terrain
 │       ├── train-model-and-motion-parity.test.mjs       train goldens; signature, id order, byte-equal merged buffers, update(world, s) ×1000 vs original
 │       ├── train-simulation-oracle-and-composition-parity.test.mjs 18000-frame oracle A/B (original/clone World), composition, headlight, behaviour
-│       └── village-windmill-parity.test.mjs             village/windmill vs original: draw index, transforms, smoke, glows, pads, shrubs, signatures, 600 frames
+│       ├── village-windmill-parity.test.mjs             village/windmill vs original: draw index, transforms, smoke, glows, pads, shrubs, signatures, 600 frames
+│       └── residents-trees-rocks-parity.test.mjs        clone log timing; original: yards, tree/rock buffers, canopy grid + queries, stream, resident poses, world.group
 └── docs/                                        this file, the other skeleton docs, parity-testing-guide.md
 ```
 
@@ -210,4 +232,5 @@ train-diorama/
 | P06 | Mossbrook station, wall clock, world per-frame orchestrator | Complete |
 | P07 | Train model, station-stop motion, smoke puffs, brake sparks, headlight | Complete |
 | P08 | Village cottages, chimney smoke, shrubs, windmill (build steps 7–8, update slots 8–9) | Complete |
-| P09–P14 | Residents/trees/rocks, free-fly camera, sheep, water/clouds/balloon, station travellers/birds, ship | Pending (see `development-roadmap.md`) |
+| P09 | Village residents, forest + canopy grid, riverside rocks (build steps 10–12, update slots 5–6) | Complete |
+| P10–P14 | Free-fly camera, sheep, water/clouds/balloon, station travellers/birds, ship | Pending (see `development-roadmap.md`) |
