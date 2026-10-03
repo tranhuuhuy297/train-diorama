@@ -43,7 +43,7 @@ describe('station shots', () => {
       assert.ok(stage.includes(id) && !selectShots({ stage: 'village-and-windmill' }).some(earlier => earlier.id === id));
       assert.deepEqual([shot.stage, shot.reportOnly, shot.parkTrain], ['residents-and-forest', false, true]);
       assert.deepEqual(shot.camera, { relativeTo: 'freeCameraStart', fov: 65 });
-      assert.deepEqual(expandHideSets(shot.hide), ['sheep', 'water', 'clouds', 'balloon', 'birds', 'stationFigures', 'train', 'puffs', 'sparks']);
+      assert.deepEqual(expandHideSets(shot.hide), ['water', 'clouds', 'balloon', 'birds', 'stationFigures', 'train', 'puffs', 'sparks']);
     }
     assert.deepEqual(FREE_STARTS.map(id => shotById(id).reference), ['07-free-camera.png', '17-night-overview-zoomed.png']);
   });

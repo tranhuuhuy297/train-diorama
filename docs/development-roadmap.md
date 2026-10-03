@@ -15,7 +15,7 @@ next phase starts. Dependencies are listed as the phases whose output a phase re
 | P08 | Village and windmill | P06, P07 | Complete |
 | P09 | Village residents, trees, rocks | P05, P08 | Complete |
 | P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Complete (headed pointer-lock check pending) |
-| P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Pending |
+| P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Complete |
 | P12 | Water, clouds, balloon | P05 | Pending |
 | P13 | Station travellers, birds | P06, P09 | Pending |
 | P14 | Full-scene parity signature, deployment prep | P01–P13 | Pending |
@@ -121,3 +121,13 @@ in; overview and free mode snap. Node parity against the original is exact (0 di
 2 and every free-flight clamp), and the `--camera-ui` browser probe answers identically on both
 sites. Still pending: the manual headed pointer-lock checklist (real lock, Esc release, WASD flight;
 headless Chromium rejects `lock(true)`), see docs/parity-testing-guide.md.
+
+P11 adds the sheep flock. Twenty-four sheep graze the meadows (W5b, right after the rocks): they
+wander, turn away from ground they may not enter, and lie down with folded legs as night falls.
+Three more graze on the rails at the clearing nearest the flock; when the train comes they startle,
+crouch, hop 3.5 m clear, wait until the line has been clear for 5–6.3 s and walk back, logging
+`[SHEEP] Startles / Jumps off track / Returns to track` lines. Node parity is bit-identical (the
+build after step 12 including the whole `world.group`, 60 s against a synthetic train, and 410 s
+of the real train against the original sim oracle with a night ramp, the fastest train and doubled
+time scale); the five sheep shots are pixel-identical and the probe's sheep section, including the
+hop frames K = [785, 824, 840], matches. `sheep` left the `cloneMissing` preset.

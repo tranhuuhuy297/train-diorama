@@ -12,6 +12,8 @@ import { GRID_WIDTH, heightAt } from './terrain/terrain-heightmap-grading.js';
 import { flattenBuildingGround } from './terrain/building-ground-flattening.js';
 import { treeCanopyHeightAt as queryTreeCanopyHeight } from './trees/tree-canopy-height-grid.js';
 import { updateWorld } from './world-per-frame-update.js';
+import { createSheepTransforms } from '../life/sheep/sheep-instance-pose-writer.js';
+import { sheepGroundAt } from '../life/sheep/sheep-pasture-ground-query.js';
 
 export { SIZE, HALF };
 
@@ -34,6 +36,12 @@ export class World {
     this.stationTravelers = [];
     this.sheepStates = [];
     this.nightAmount = 0;
+    this.sheepTransforms = createSheepTransforms();
+    // Filled by the sheep build step; null layers mean a partial build without sheep.
+    this.trackSheep = [];
+    this.sheep = null;
+    this.sheepLegs = null;
+    this.sheepEars = null;
     this.balloon = new THREE.Group();
     this.birdPerches = [];
     // Created before the track so every later placement sees the same stream.
@@ -56,6 +64,11 @@ export class World {
   /** True when (x, z) lies inside any keep-out circle grown by `pad`. */
   excluded(x, z, pad = 0) {
     return this.exclusions.some(circle => Math.hypot(circle.x - x, circle.z - z) < circle.r + pad);
+  }
+
+  /** Pasture ground height at (x, z) or null; may write the slope normal into `normalOut`. */
+  sheepGroundAt(x, z, normalOut) {
+    return sheepGroundAt(this, x, z, normalOut);
   }
 
   /** Track point at arc length s (wrapped); a fresh vector when no target is given. */

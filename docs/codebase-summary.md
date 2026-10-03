@@ -75,6 +75,15 @@ train-diorama/
 │   │   ├── extrude-profile-along-frames.js       extrude(frames, profile, caps)
 │   │   └── building-wall-and-roof-vents.js       addWallVent, addRoofVent
 │   ├── life/
+│   │   ├── sheep/
+│   │   │   ├── sheep-geometry-and-instanced-meshes.js   SHEEP_CAPACITY 27, SHEEP_LEGS, SHEEP_EARS, createSheepInstancedMeshes (body/leg/ear layers)
+│   │   │   ├── sheep-pasture-ground-query.js            sheepGroundAt(world, x, z, normalOut): pasture mask + slope normal
+│   │   │   ├── pasture-sheep-spawner.js                 spawnPastureSheep: 24 sheep in ≤ 4000 attempts (W5b draws)
+│   │   │   ├── trackside-sheep-flock-site.js            findTracksideFlockSite (clearing score), createTrackSheep (3 routes + r1.2 clearings)
+│   │   │   ├── build-sheep-flock.js                     buildSheepFlock: meshes → pasture → clearing → rail sheep → counts → add → pose
+│   │   │   ├── track-sheep-escape-state-machine.js      TRACK_SHEEP_PRESETS, advanceTrackSheep, advanceTrackSheepFlock (slot 2, [SHEEP] logs)
+│   │   │   ├── sheep-locomotion-and-route-motion.js     updateSheepFlock (slot 3): sleep, wander, blocked turn, route sway, rail height
+│   │   │   └── sheep-instance-pose-writer.js            createSheepTransforms, writeSheepInstancePose (tilt, bob, hop, legs, ears), markSheepInstancesDirty
 │   │   └── village/
 │   │       ├── village-resident-materials-and-primitives.js 10 resident materials, shape/block parts, row emitters, makeHead
 │   │       ├── village-woman-and-man-outfits.js         dressVillageWoman (lathe dress, apron, belt, sleeves, locks), dressVillageMan
@@ -157,14 +166,16 @@ train-diorama/
 │       ├── research-capture-paths.mjs           research-dir resolver, capture paths, skip reason
 │       ├── parity-shot-factory-and-camera-poses.mjs shot() record factory + defaults, home/zoomed/chase/bridge poses
 │       ├── camera-mode-parity-shots.mjs         camera-mode shots (side/bridge/orbit), strict + relaxed twins
+│       ├── sheep-flock-parity-shots.mjs         sheep close-ups (day, night) and three hop shots around SHEEP_HOP_K2
 │       ├── camera-ui-runtime-probe.mjs          parity:probe --camera-ui: mode keys, toasts, glide/snap, click-to-lock, flight-key capture
 │       ├── shot-region-projection.mjs           named regions (village, windmill): page-side projection, device crops, selection
 │       ├── capture-parity-shots.mjs             CLI parity:capture (sessions, PNG + meta incl. regions), prepareShotScene
 │       ├── compare-parity-shots.mjs             CLI parity:compare (metrics, per-region crops, heatmaps, meta warnings, report)
 │       ├── intra-site-shot-checks.mjs           same-site relations (differs/identical) and shot-action result checks
-│       ├── runtime-counts-probe.mjs             CLI parity:probe (renderer.info, world fields, village, station, diff; --shot, --fields)
+│       ├── runtime-counts-probe.mjs             CLI parity:probe (renderer.info, world fields, village, station, sheep, diff; --shot, --fields)
 │       ├── village-windmill-runtime-probe.mjs   exact village/windmill probe fields (homes, windmill transform, rotor, smoke)
 │       ├── forest-residents-runtime-probe.mjs   tree/rock/resident counts, exclusion count + expected sheep-clearing delta
+│       ├── sheep-flock-runtime-probe.mjs        sheep section: layer counts, routes, first pasture spots, stranding candidates, hop frames K1..K3
 │       ├── probe-result-diffing.mjs             diffProbeResults, per-scenario diffTargets
 │       ├── station-runtime-probe.mjs            station probe section, sign hash, frozen + live clock checks, font-race reload
 │       ├── post-pass-synthetic-input-probe.mjs  post material outputs on synthetic inputs, cross-site diff
@@ -183,6 +194,7 @@ train-diorama/
 │   │   ├── scene-signature-key-builders.mjs     material/geometry/instance/texture keys
 │   │   ├── clone-world-factory.mjs              createCloneWorld(options), WORLD_CORE_SKIP (CM off + DOM shim first)
 │   │   ├── clone-simulation-driver.mjs          createCloneSimulation (oracle ctx shape, freeCameraPose), setCloneMode, stepCloneFrame, snapshotTrainState
+│   │   ├── sheep-flock-parity-lockstep.mjs      firstSheepFlockMismatch (in-place, Object.is), runSheepLockstep (per-side Math.random + [SHEEP] logs)
 │   │   ├── smoke-puff-behaviour-checks.mjs      trackPuffs + assertPuffBehaviour: spec-formula smoke gaps, lifetimes, steady state
 │   │   └── fresh-process-train-material-ids.mjs Train material id rows from a child process (cold npr cache)
 │   ├── unit/
@@ -214,7 +226,9 @@ train-diorama/
 │   │   ├── village-and-windmill-build-logic.test.mjs     shutter cycle, smoke formula, rotor, shrubs, village guard, site search, windmill structure
 │   │   ├── parity-village-windmill-shots-regions-and-probe.test.mjs village shots, unbuiltAfterWindmill, regions + crops, probe section
 │   │   ├── village-walk-cycle-and-tree-rock-scatter.test.mjs walk-cycle table, canopy grid edges, W4/W5a draw accounting (stub worlds)
-│   │   └── parity-forest-residents-shots-actions-and-probe.test.mjs forest shots, water/cloneMissing, page actions, forest probe, relations
+│   │   ├── parity-forest-residents-shots-actions-and-probe.test.mjs forest shots, water/cloneMissing, page actions, forest probe, relations
+│   │   ├── track-sheep-escape-state-machine.test.mjs   FSM windows, reaction delay, same-step jump, escape/return, flock loop, fuzz vs original
+│   │   └── parity-sheep-shots-and-probe.test.mjs        sheep shots, close-up pose, probe section and comparison rules
 │   └── parity/
 │       ├── harness-self-check.test.mjs                  cache-gated original World/stepper/oracle checks (npm run test:parity)
 │       ├── terrain-track-bridge-parity.test.mjs         world core vs original: bytes, queries, signatures (multiset + ordered), material request order, draws, build time
@@ -223,7 +237,9 @@ train-diorama/
 │       ├── train-simulation-oracle-and-composition-parity.test.mjs 18000-frame oracle A/B (original/clone World), composition, headlight, behaviour
 │       ├── village-windmill-parity.test.mjs             village/windmill vs original: draw index, transforms, smoke, glows, pads, shrubs, signatures, 600 frames
 │       ├── residents-trees-rocks-parity.test.mjs        clone log timing; original: yards, tree/rock buffers, canopy grid + queries, stream, resident poses, world.group
-│       └── camera-modes-parity.test.mjs                 11 708 frames vs the oracle: side sweep, train rig, bridge, free flight clamps, pose save/restore
+│       ├── camera-modes-parity.test.mjs                 11 708 frames vs the oracle: side sweep, train rig, bridge, free flight clamps, pose save/restore
+│       ├── sheep-flock-parity.test.mjs                  build after step 12 (stream, ground sweep, states, clearing, exclusions, layers, world.group) + 60 s synthetic train
+│       └── sheep-flock-oracle-train-parity.test.mjs     oracle train lockstep: 260 s day/night/wake, 90 s at speedMul 2.5, 60 s of 0.1 s steps
 └── docs/                                        this file, the other skeleton docs, parity-testing-guide.md
 ```
 
@@ -241,4 +257,5 @@ train-diorama/
 | P08 | Village cottages, chimney smoke, shrubs, windmill (build steps 7–8, update slots 8–9) | Complete |
 | P09 | Village residents, forest + canopy grid, riverside rocks (build steps 10–12, update slots 5–6) | Complete |
 | P10 | Camera modes: free fly (pointer lock), train fly-along rig, bridge tripod | Complete (headed pointer-lock check pending) |
-| P11–P14 | Sheep, water/clouds/balloon, station travellers/birds, ship | Pending (see `development-roadmap.md`) |
+| P11 | Sheep flock: pasture sheep, trackside clearing, rail-sheep escape state machine (build step 12, update slots 2–3) | Complete |
+| P12–P14 | Water/clouds/balloon, station travellers/birds, ship | Pending (see `development-roadmap.md`) |

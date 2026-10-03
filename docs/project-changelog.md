@@ -1,5 +1,39 @@
 # Project changelog
 
+## [0.11.0] - 2026-10-03
+
+feat(life): sheep flock with pasture grazing, sleep, and the rail sheep that hop clear of the train.
+
+### Added
+
+- `src/life/sheep/`: `createSheepInstancedMeshes` (body = fleece + head + tail, legs, ears; three
+  instanced layers of 27 / 108 / 54 over one npr material), `sheepGroundAt` (pasture mask + slope
+  normal, also `World#sheepGroundAt`), `spawnPastureSheep` (24 sheep, W5b draw order),
+  `findTracksideFlockSite` / `createTrackSheep` (clearing score, three routes, r1.2 clearings,
+  `No safe trackside sheep clearing`), `buildSheepFlock`, `TRACK_SHEEP_PRESETS` /
+  `advanceTrackSheep` / `advanceTrackSheepFlock` (three.js-free state machine with the exact
+  `[SHEEP]` lines), `updateSheepFlock` (sleep, wander, blocked turn, route sway, rail height),
+  `createSheepTransforms` / `writeSheepInstancePose` / `markSheepInstancesDirty`.
+- Tests: `tests/unit/track-sheep-escape-state-machine.test.mjs` (FSM cases + 3 × 20 000-step fuzz vs
+  the original), `tests/unit/parity-sheep-shots-and-probe.test.mjs`,
+  `tests/parity/sheep-flock-parity.test.mjs` (build + synthetic train),
+  `tests/parity/sheep-flock-oracle-train-parity.test.mjs` (oracle lockstep runs), helper
+  `tests/helpers/sheep-flock-parity-lockstep.mjs`.
+- Parity tooling: `tools/parity/sheep-flock-parity-shots.mjs` (`sheep-flock-day-closeup`,
+  `sheep-flock-night-closeup`, `sheep-track-hop-1..3`, `SHEEP_HOP_K2`), in-page pose
+  `sheepFlockCloseup`, `tools/parity/sheep-flock-runtime-probe.mjs` (probe section `sheep` with
+  hop frames K1..K3).
+
+### Changed
+
+- `world.js`: `sheepTransforms`, `trackSheep`, null sheep layers in init; `sheepGroundAt` wrapper.
+- `world-build-steps.js`: `buildRocksAndSheep` runs the rocks, then `buildSheepFlock`.
+- `world-per-frame-update.js`: slots 2–3 (rail-sheep state machine, flock motion) behind
+  `world.sheep !== null`.
+- `parity-shot-list.mjs`: preset `cloneMissing` no longer hides the sheep.
+- Earlier parity tests: the residents/forest suite compares the original's sheep layers and
+  clearings (no more filters); unit fixtures follow the new preset and the probe's exclusion delta 0.
+
 ## [0.10.0] - 2026-10-03
 
 feat(camera): free-fly pointer-lock camera, train fly-along rig and bridge tripod.

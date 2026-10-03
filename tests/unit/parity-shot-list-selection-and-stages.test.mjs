@@ -17,6 +17,7 @@ const FOREST_IDS = ['overview-day-settled-masked', 'overview-zoomed-orbited-mask
   'trees-sway-t0', 'trees-sway-t1', 'trees-sway-hold', 'trees-debug-hidden', 'station-free-start-day', 'station-free-start-night'];
 const CAMERA_IDS = ['train-camera-day', 'bridge-camera-day', 'bridge-camera-evening', 'free-camera-day', 'train-camera-night']
   .flatMap(id => [id, `${id}-relaxed`]);
+const SHEEP_IDS = ['sheep-flock-day-closeup', 'sheep-flock-night-closeup', 'sheep-track-hop-1', 'sheep-track-hop-2', 'sheep-track-hop-3'];
 // Shell-and-sky stage, in shot-list order.
 const SHELL_IDS = [
   'sky-day', 'sky-evening', 'sky-night', 'sky-day-pixel360', 'sky-day-ink-off', ...SKY_DIRECTION_IDS,
@@ -32,9 +33,10 @@ describe('shot list and research captures', () => {
     assert.deepEqual(selectShots({ stage: 'train' }).map(shot => shot.id).slice(-TRAIN_ONLY_IDS.length), TRAIN_ONLY_IDS);
     assert.deepEqual(selectShots({ stage: 'village-and-windmill' }).map(shot => shot.id).slice(SHELL_IDS.length + 3 + TRAIN_ONLY_IDS.length), VILLAGE_IDS);
     const forestStage = selectShots({ stage: 'residents-and-forest' }).map(shot => shot.id);
-    assert.deepEqual(forestStage.slice(-(FOREST_IDS.length + CAMERA_IDS.length)), [...FOREST_IDS, ...CAMERA_IDS]);
+    const forestTail = [...FOREST_IDS, ...CAMERA_IDS, ...SHEEP_IDS];
+    assert.deepEqual(forestStage.slice(-forestTail.length), forestTail);
     const strictCount = 30 + SKY_DIRECTION_IDS.length + WORLD_CORE_IDS.length + STATION_CLOSEUP_IDS.length + TRAIN_ONLY_IDS.length
-      + VILLAGE_IDS.length + FOREST_IDS.length + CAMERA_IDS.length;
+      + VILLAGE_IDS.length + forestTail.length;
     assert.equal(selectShots({ stage: 'full-scene' }).length, strictCount);
     assert.deepEqual(selectShots({ ids: ['hud-day', 'sky-day'] }).map(shot => shot.id), ['hud-day', 'sky-day']);
     assert.throws(() => selectShots({ ids: ['nope'] }), /Unknown parity shot/);

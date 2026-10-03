@@ -24,7 +24,7 @@ describe('residents and forest shots', () => {
   test('stage, masks, poses, actions and freshness', () => {
     assert.equal(ACTIVE_PARITY_STAGE, 'residents-and-forest');
     assert.deepEqual(validateShotList(), []);
-    const masked = ['sheep', 'water', 'clouds', 'balloon', 'birds', 'stationFigures', 'puffs', 'sparks'];
+    const masked = ['water', 'clouds', 'balloon', 'birds', 'stationFigures', 'puffs', 'sparks'];
     for (const id of ['overview-day-settled-masked', 'overview-zoomed-orbited-masked', 'overview-night-masked', 'village-residents-yard', 'trees-debug-hidden']) {
       const shot = byId(id);
       assert.deepEqual([shot.stage, shot.thresholdClass, shot.reportOnly, expandHideSets(shot.hide)], ['residents-and-forest', 'deterministic', false, masked]);
@@ -46,7 +46,7 @@ describe('hide sets and in-page actions', () => {
     const d = { world, scene: new THREE.Scene() };
     // World init's empty balloon group is not in the scene yet, so hiding it changes nothing.
     assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: expandHideSets(['cloneMissing']), worldCoreKeys: [] }),
-      { sheep: 0, water: 0, clouds: 0, balloon: 1, birds: 0, stationFigures: 0 });
+      { water: 0, clouds: 0, balloon: 1, birds: 0, stationFigures: 0 });
     assert.equal(world.balloon.parent, null);
     const water = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.ShaderMaterial({ uniforms: { uHeight: { value: null } } }));
     world.group.add(water);
@@ -99,13 +99,15 @@ describe('forest probe section and same-site checks', () => {
   test('raw counts from parity-surface names and the exclusion delta rule', () => {
     const probe = inPage({ world }, collectForestResidentsProbe);
     assert.deepEqual(probe.treeCounts, world.treeLayers.map(layer => layer.count));
-    assert.deepEqual([probe.residentMeshCount, probe.exclusionCount, probe.hasSheepFlock], [33, world.exclusions.length, false]);
+    assert.deepEqual([probe.residentMeshCount, probe.exclusionCount, probe.hasSheepFlock], [33, world.exclusions.length, true]);
     assert.ok(probe.rockCount > 0 && probe.rockCount <= 80);
     assert.equal(inPage({ world: { treeLayers: [] } }, collectForestResidentsProbe), null);
-    const original = { ...probe, exclusionCount: probe.exclusionCount + 3, hasSheepFlock: true };
-    assert.deepEqual(compareForestResidentsProbe(original, probe), { pass: true, failures: [], exclusionDelta: -3 });
-    assert.equal(compareForestResidentsProbe({ ...original, rockCount: 1 }, probe).pass, false);
-    assert.equal(compareForestResidentsProbe({ ...probe, hasSheepFlock: true }, probe).pass, false);
+    assert.deepEqual(compareForestResidentsProbe(probe, probe), { pass: true, failures: [], exclusionDelta: 0 });
+    // A site without the flock lacks exactly its three clearings.
+    const flockless = { ...probe, exclusionCount: probe.exclusionCount - 3, hasSheepFlock: false };
+    assert.deepEqual(compareForestResidentsProbe(flockless, probe), { pass: true, failures: [], exclusionDelta: 3 });
+    assert.equal(compareForestResidentsProbe({ ...probe, rockCount: 1 }, probe).pass, false);
+    assert.equal(compareForestResidentsProbe({ ...probe, hasSheepFlock: false }, probe).pass, false);
     assert.equal(compareForestResidentsProbe(null, probe).pass, false);
   });
 

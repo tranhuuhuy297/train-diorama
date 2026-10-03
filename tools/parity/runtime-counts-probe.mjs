@@ -1,5 +1,5 @@
 // CLI: renderer.info, key world/sim fields and the exact village/windmill state in the identical frozen state on both
-// sites, the station section, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
+// sites, the station and sheep sections, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
 // node tools/parity/runtime-counts-probe.mjs [--target t] [--scenario default|sky-only|both] [--profile p] [--strict] [--skip-checks]
 // [--skip-post-probe] [--shot id] (that shot's prepared scene only) [--fields calls,triangles] (renderer fields compared, plus village)
 // [--camera-ui] (live-page camera mode/lock/key probe only; see camera-ui-runtime-probe.mjs)
@@ -18,6 +18,7 @@ import { collectVillageWindmillProbe } from './village-windmill-runtime-probe.mj
 import { collectForestResidentsProbe, compareForestResidentsProbe } from './forest-residents-runtime-probe.mjs';
 import { diffTargets } from './probe-result-diffing.mjs';
 import { runCameraUiProbe, writeCameraUiReport } from './camera-ui-runtime-probe.mjs';
+import { probeSheepAcrossSites } from './sheep-flock-runtime-probe.mjs';
 
 export { diffProbeResults } from './probe-result-diffing.mjs';
 
@@ -135,6 +136,7 @@ async function main() {
       postOutputs[target] = probed.postOutputs;
     }
     if (!shot) output.station = await compareStationAcrossSites(browser, output.targets);
+    if (!shot) output.sheep = await probeSheepAcrossSites(browser, targets, resolveTargetBaseUrl);
   } finally {
     await browser.close();
     await stopCloneServer();
@@ -170,6 +172,9 @@ async function main() {
     console.log(`${pass ? 'PASS' : 'FAIL'} station probe after ${attempts} attempt(s)${differing.length > 0 ? `: differs in ${differing.join(', ')}` : ''}`);
     if (!pass) failures++;
   }
+  const sheep = output.sheep?.comparison;
+  if (sheep) console.log(`${sheep.pass ? 'PASS' : 'FAIL'} sheep probe: hop frames ${JSON.stringify(sheep.hopFrames)}${sheep.pass ? '' : `; ${sheep.failures.join('; ')}`}`);
+  if (sheep && !sheep.pass) failures++;
   if (output.postSynthetic) {
     const worst = Math.max(...Object.values(output.postSynthetic.combinations).map(entry => entry.maxChannelDiff));
     console.log(`${output.postSynthetic.pass ? 'PASS' : 'FAIL'} post pass synthetic inputs: max channel diff ${worst} (limit ${output.postSynthetic.limit})`);

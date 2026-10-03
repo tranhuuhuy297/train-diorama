@@ -105,7 +105,8 @@ their reserved constructor slot in a later phase without changing this file's pu
   village, windmill, trees, rocks, water, sky, balloon and perches are added across P06–P13.
 - `train/*`: landed in P07 (see "Train" below).
 - `life/*` (villagers, sheep, station travellers, birds): added across P09–P13; the village
-  residents landed in P09 (see "Village residents, forest and rocks" below).
+  residents landed in P09 (see "Village residents, forest and rocks" below), the sheep flock in
+  P11 (see "Sheep flock" below).
 
 ## Shared lighting uniform bag (`src/materials/shared-lighting-uniforms.js`)
 
@@ -359,7 +360,8 @@ differing variant confirming the probe is sensitive).
 ```
 World ctor: group, noShadow, N=1200, frames, heights (Float32 201²), bridge, stationS, exclusions,
   buildingFoundations, windmillBlades (Group), clouds, treeLayers, houseSmoke, stationTravelers,
-  sheepStates, nightAmount, balloon (Group), birdPerches, rand = mulberry32(42)
+  sheepStates, nightAmount, sheepTransforms (+ clone-only trackSheep [], sheep/sheepLegs/sheepEars null),
+  balloon (Group), birdPerches, rand = mulberry32(42)
   -> runWorldBuildSteps(world, {stopAfter, skip})
      1 buildTrackFrames  track/track-spline-frames-and-queries   curve, length, frames[0..1200], sx/sz
      2 findBridge        track/bridge-span-detection            bridge [30, 178]
@@ -374,7 +376,7 @@ World ctor: group, noShadow, N=1200, frames, heights (Float32 201²), bridge, st
                          surface (+ colours, FLOWERS) -> skirt (topY, STRATA) -> plinth -> heightTex
     10 createVillageResidents  world-build-steps → life/village       residents on the first two homes, yards r2.2 ×2 (P09)
     11 buildTrees        trees/tree-instanced-layers            4 instanced layers, canopy grid (W4) (P09)
-    12 buildRocksAndSheep world-build-steps → rocks/*           ≤ 80 rocks (W5a); sheep flock appended in P11
+    12 buildRocksAndSheep world-build-steps → rocks/*, life/sheep  ≤ 80 rocks (W5a), then the sheep flock (W5b) (P11)
      [13 buildWater .. 16 buildBirdPerches: later phases]
 ```
 
@@ -464,8 +466,9 @@ buildStation(world)                                    build step 6 (after build
   | 9 | windmill rotor | P08 |
   | 10–11 | clouds; balloon | P12 |
 
-  `update` assumes a fully built world; the only guard is slot 5 (`villageResidents?.update(…) ?? null`,
-  the partial-world convention). Tests call `updateStationClock` on partial worlds.
+  `update` assumes a fully built world; the only guards are slots 2–3 (skipped while `world.sheep`
+  is null) and slot 5 (`villageResidents?.update(…) ?? null`), the partial-world convention. Tests
+  call `updateStationClock` on partial worlds.
 - **Error strings added:** `Station name canvas context unavailable`.
 
 ## Train (`src/train/`, P07)
@@ -617,8 +620,9 @@ buildTrees(world)                                      build step 11 (W4)
  ├ npr sway {vertexColors, stipple .55, stippleScale 2.4, treeSway} then bush {same minus treeSway}
  └ per species: computeBoundingBox → InstancedMesh(count) → per instance setMatrixAt, setColorAt, stamp
                 → world.group.add → world.treeLayers.push (array from World init, never replaced)
-buildRocksAndSheep(world)                              build step 12 (W5a; W5b sheep follow in P11)
- └ buildRiversideRocks: Dodecahedron(.6) jitter(.4, 9) '#9d978c', InstancedMesh(80), count = placed
+buildRocksAndSheep(world)                              build step 12 (W5a rocks, then W5b sheep)
+ ├ buildRiversideRocks: Dodecahedron(.6) jitter(.4, 9) '#9d978c', InstancedMesh(80), count = placed
+ └ buildSheepFlock (see "Sheep flock" below)
 ```
 
 - **Measured layout.** 3749 conifers, 1215 round, 932 cluster, 769 bushes (6665 trees; autumn
@@ -742,3 +746,88 @@ dispose ──> disposeFirstPersonControls(d): unlock if locked → remove 'clic
   transient thresholds); stage `residents-and-forest`.
 - `tools/parity/camera-ui-runtime-probe.mjs` (new): `parity:probe -- --camera-ui` (see the parity
   testing guide).
+
+## Sheep flock (`src/life/sheep/`, P11)
+
+```
+buildSheepFlock(world)                                 tail of build step 12 (W5b, same world.rand after the rocks)
+ ├ createSheepInstancedMeshes: ear Ico(.105) → fleece Ico(.42) jitter(.2, 3) → head Ico(.18) → tail Ico(.14)
+ │    → mergeGeometries(fleece, head, tail) → leg Box(.1, .3, .1) → npr {vertexColors, stipple .2, stippleScale 4}
+ │    → InstancedMesh body 27, legs 108, ears 54 (one shared material)
+ ├ spawnPastureSheep: attempts while k < 4000 and placed < 24; x, z = ((r − .5)·124)·.9 (2 draws),
+ │    sheepGroundAt(x, z, own normal) → on accept 5 draws: direction, size, phase, speed, turnSpeed
+ ├ findTracksideFlockSite: frames 0, 12, 24 … (not bridge, not excluded at pad 2); side −1 then +1:
+ │    shoulder p + r·(side·3.5) level, every preset's exit (frame r) dry/level/free; score Σ max(0, 18 − d)
+ │    over the pasture sheep; strict > keeps the first best; none → Error 'No safe trackside sheep clearing'
+ ├ createTrackSheep: per preset distance ((i/N)·length) + spacing, center, flat tangent, outward
+ │    normalize(tangent × UP)·(side·preset.side) → route + member → sheepStates, trackSheep, exclusion r1.2
+ ├ counts n / 4n / 2n, frustumCulled false, world.sheep|sheepLegs|sheepEars, group.add(body, legs, ears)
+ └ updateSheepFlock(world, 0, 0)                       dt 0: blends stay put, every matrix written
+updateWorld slot 2 advanceTrackSheepFlock(world, trainMotion, dt)   per rail sheep: FSM → console.log(event) → speed, direction
+updateWorld slot 3 updateSheepFlock(world, elapsed, dt)             sleep → wander → route | pasture → gait → height → pose
+```
+
+| module | exports |
+|---|---|
+| `sheep-geometry-and-instanced-meshes.js` | `SHEEP_CAPACITY` 27, `SHEEP_LEGS` (4 × {x, z, swing}), `SHEEP_EARS` (2 × {x, heading, phase}), `createSheepInstancedMeshes` |
+| `sheep-pasture-ground-query.js` | `sheepGroundAt(world, x, z, normalOut)` (also `World#sheepGroundAt`) |
+| `pasture-sheep-spawner.js` | `spawnPastureSheep(world)` → placed count |
+| `trackside-sheep-flock-site.js` | `findTracksideFlockSite(world)` → {frameIndex, side, score}; `createTrackSheep(world, site)` |
+| `build-sheep-flock.js` | `buildSheepFlock(world)` |
+| `track-sheep-escape-state-machine.js` (no three.js) | `TRACK_SHEEP_PRESETS` (3, unfrozen), `advanceTrackSheep(route, train, trackLength, dt)`, `advanceTrackSheepFlock(world, trainMotion, dt)` |
+| `sheep-locomotion-and-route-motion.js` | `updateSheepFlock(world, elapsed, dt)` |
+| `sheep-instance-pose-writer.js` | `createSheepTransforms()` (17 scratch objects, `World` init), `writeSheepInstancePose`, `markSheepInstancesDirty` |
+
+- **Ground query.** Rejects, in order: |x| or |z| > 60; height < 1 or > 8; nearest track sample
+  < 5; inside an exclusion grown by 1; fbm(x·0.045 + 10, z·0.045 − 3, 3) > −0.05. Only then is
+  the normal written: normalize(h(x − .6) − h(x + .6), 1.2, h(z − .6) − h(z + .6)); the height is
+  returned when normal.y ≥ 0.88, else null (normal stays written).
+- **State machine.** hopAge ← min(hopDuration + .3, hopAge + dt); ahead = positiveModulo(route −
+  train, L), behind = (L − ahead) % L; danger ⇔ ahead < max(18, 3.2·v) or behind < length + 5.
+  Danger zeroes clearTime and startles a `track`/`returning` sheep (reactionTime = delay); no
+  danger accumulates clearTime and returns a `waiting` sheep after returnDelay. A `startled` sheep
+  counts down and jumps (`escaping`, hopAge 0) when the delay ends, ahead < max(5, 1.5·v) or the
+  tail window holds. The offset then walks toward 0 / held / 3.5 / 3.5 / 0 at 0 / 0 / escapeSpeed /
+  0 / 0.65 m/s; arrival is exact equality (`escaping` → `waiting`, `returning` → `track`). Only the
+  last event of a step is returned. Slot 2 copies the route speed to the sheep and faces it along
+  the outward vector (+π while returning).
+- **Locomotion.** sleep → night amount (0 on the rails) at rate 1.8; wakefulness w = 1 −
+  smoothstep(0, .65, sleep); direction += turnSpeed·dt·w and a candidate step speed·dt·w. Rail
+  sheep: x, z = center + outward·offset + (tangent·along + outward·across) with along/across easing
+  (rate 5) toward a Lissajous sway in `track` mode (heading and speed from its analytic velocity),
+  height max(ground, lerp(ballast slope, rail top, rail support)), shared normal = UP. Pasture
+  sheep: move only onto valid ground, otherwise turn at 2.4 rad/s and re-query the current spot.
+  gait and groundHeight ease at rate 10 (gait goal min(1, speed/.65) on the rails, w on pasture).
+- **Pose.** Orientation slerps (rate 8) toward slerp(slope tilt, identity, .55) × heading; body y
+  = groundHeight − .05 + trot bob − sleep crouch + hop arc 4p(1 − p)·hopHeight; squash/stretch for
+  the hop, the landing (.3 s) and the startled crouch, width 1/√stretch; legs swing ±0.4 rad with
+  gait, tuck during the hop and fold with sleep; ears flap with min(1, speed/.34)·.32·w.
+- **Measured layout.** 24 pasture sheep in 450 attempts (the stream stands at draw 85693 after the
+  sheep, 1020 W5b draws); clearing at track frame 348, side −1 (score 84.44); routes at 77.380,
+  79.930 and 83.130 m; 41 exclusions; `world.group` children 72–74 = body, legs, ears.
+- **Per-frame cost.** At most two `sheepGroundAt` calls per pasture sheep; no allocation in slots
+  2–3 (scratch objects from `world.sheepTransforms`, the movement goal via a switch).
+- **Render accounting.** Three instanced layers, drawn in the main and shadow passes: the clone's
+  frozen default went from 1004 to 1010 calls, 1,657,126 to 1,681,318 triangles, 360 to 363
+  geometries (textures 5, programs 20 unchanged; original 1373 / 1,762,696 / 419 / 6 / 25).
+- **Quirks kept for parity:** a pasture sheep with no valid ground at both spots treats the height
+  as 0 and sinks (none of the current spawn points qualifies); the startle line is lost when the
+  jump fires in the same step; the danger test ignores train speed when the train stands (station
+  dwell, speedMul 0); rail sheep never sleep; the shared slope normal leaks between sheep; the
+  clearings are added after trees and rocks; pasture sheep ignore each other; the pasture ear flap
+  uses the wander speed even while turning; a startle cannot be called off.
+
+### Parity tooling additions (modification-map entries)
+
+- `tools/parity/sheep-flock-parity-shots.mjs` (new; the shot list stays under its budget):
+  `SHEEP_HOP_K2` 824 and `sheepFlockShots(stage)` → `sheep-flock-day-closeup` (120 frames),
+  `sheep-flock-night-closeup` (600), `sheep-track-hop-1..3` (K2 − 12, K2 + 20, K2 + 90); hide
+  `cloneMissing` + `transient`, in-page pose `sheepFlockCloseup`; stage `residents-and-forest`.
+  `parity-shot-list.mjs` preset `cloneMissing` drops `sheep` (now water, clouds, balloon, birds,
+  station figures).
+- `tools/parity/page-shot-actions.mjs`: in-page pose `sheepFlockCloseup` (route 2: center −
+  outward·9, + 5 up, + tangent·3, looking at center + 0.5 up).
+- `tools/parity/sheep-flock-runtime-probe.mjs` (new) wired into `runtime-counts-probe.mjs`: probe
+  section `sheep` (see the parity testing guide).
+- `tests/helpers/sheep-flock-parity-lockstep.mjs` (new): `firstSheepFlockMismatch`,
+  `runSheepLockstep`.

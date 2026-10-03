@@ -15,6 +15,7 @@ import { buildTerrain } from './terrain/terrain-skirt-plinth-and-water-height-te
 import { buildTrees } from './trees/tree-instanced-layers.js';
 import { buildRiversideRocks } from './rocks/riverside-rock-scatter.js';
 import { VillageResidents } from '../life/village/village-residents.js';
+import { buildSheepFlock } from '../life/sheep/build-sheep-flock.js';
 
 // Keep-out radius around each resident's yard, read by the tree and rock scatters.
 const YARD_CLEARANCE = 2.2;
@@ -30,9 +31,10 @@ function createVillageResidents(world) {
   }
 }
 
-// Rocks now; the sheep flock joins this step later and continues the same random stream.
+// Rocks, then the sheep flock continuing the same random stream.
 function buildRocksAndSheep(world) {
   buildRiversideRocks(world);
+  buildSheepFlock(world);
 }
 
 export const WORLD_BUILD_STEPS = Object.freeze([

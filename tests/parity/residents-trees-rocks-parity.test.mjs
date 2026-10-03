@@ -61,7 +61,8 @@ describe('residents, trees and rocks on the clone', { timeout: 300_000 }, () => 
     assert.equal(world.treeLayers.length, 4);
     assert.ok(world.treeLayers.every(layer => layer.isInstancedMesh && layer.count > 0 && layer.parent === world.group));
     assert.ok(rocksOf(world).count <= 80);
-    assert.deepEqual(world.exclusions.slice(-2).map(circle => circle.r), [2.2, 2.2]);
+    // The two yards, then the sheep flock's three trackside clearings.
+    assert.deepEqual(world.exclusions.slice(-5).map(circle => circle.r), [2.2, 2.2, 1.2, 1.2, 1.2]);
     assert.ok(world.treeCanopyHeightAt(0, 0, 70) > 10);
     const logged = [];
     const realLog = console.log;
@@ -168,10 +169,9 @@ describe('residents, trees and rocks parity with the original', { skip, timeout:
       [expected.material.uniforms.uStipple.value, expected.material.uniforms.uStippleScale.value, expected.material.vertexColors]);
     assert.equal(actual.material, npr({ vertexColors: true, stipple: 0.3, stippleScale: 3 }), 'rock material cache key');
     assert.deepStrictEqual([actual.instanceColor, expected.instanceColor], [null, null]);
-    const exclude = new Set([original.sheep, original.sheepLegs, original.sheepEars, ...original.stationTravelers.map(traveler => traveler.figure)]);
+    const exclude = new Set(original.stationTravelers.map(traveler => traveler.figure));
     assertSameSignature(original.group, clone.group, 'world.group', { exclude, cloneSignature: groupSignature });
     assertSameSignature(original.group, clone.group, 'world.group order', { exclude, ordered: true, cloneSignature: groupSignature });
-    assert.equal(clone.exclusions.length, original.exclusions.length - 3);
-    assert.deepStrictEqual(clone.exclusions, original.exclusions.slice(0, clone.exclusions.length));
+    assert.deepStrictEqual(clone.exclusions, original.exclusions);
   });
 });

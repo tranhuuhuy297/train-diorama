@@ -4,10 +4,11 @@
 import { applyCameraPose, waitFrames } from './page-parity-helpers.mjs';
 
 // Names validated in the shot list; each must have a builder in resolveInPageCameraPose (unit-tested).
-export const IN_PAGE_CAMERA_POSES = Object.freeze(['villageResidentYard']);
+export const IN_PAGE_CAMERA_POSES = Object.freeze(['villageResidentYard', 'sheepFlockCloseup']);
 
 // Runs in the page (serialised alone, so the registry lives inside); returns world-space {position, target}.
 // villageResidentYard: woman's home frame, a few metres in front of her yard, looking at her walk line.
+// sheepFlockCloseup: 9 m back from rail sheep 2 (away from its safe spot), 5 m up, 3 m along the track.
 export function resolveInPageCameraPose(name) {
   const d = window.__diorama;
   const poses = {
@@ -15,6 +16,13 @@ export function resolveInPageCameraPose(name) {
       const { home, depth } = d.world.villageResidents.residents[0];
       const local = (x, y, z) => home.localToWorld(d.camera.position.clone().set(x, y, z)).toArray();
       return { position: local(-1.5, 2.4, depth / 2 + 5.5), target: local(0, 0.7, depth / 2 + 0.65) };
+    },
+    sheepFlockCloseup: () => {
+      const { center, outward, tangent } = d.world.trackSheep[1].route;
+      const position = center.clone().addScaledVector(outward, -9);
+      position.y += 5;
+      position.addScaledVector(tangent, 3);
+      return { position: position.toArray(), target: [center.x, center.y + 0.5, center.z] };
     },
   };
   if (!poses[name]) throw new Error(`Unknown in-page camera pose: ${name}`);

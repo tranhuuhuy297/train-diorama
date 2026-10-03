@@ -6,6 +6,7 @@ import { shot, ZOOMED, ZOOMED_ORBITED, LOCO_CHASE, BRIDGE_VIEW, lookFromTarget, 
 import { REGION_NAMES } from './shot-region-projection.mjs';
 import { IN_PAGE_CAMERA_POSES } from './page-shot-actions.mjs';
 import { cameraModeShots } from './camera-mode-parity-shots.mjs';
+import { sheepFlockShots } from './sheep-flock-parity-shots.mjs';
 import { resolveResearchDir, researchCapturePath } from './research-capture-paths.mjs';
 
 export { resolveResearchDir, researchCapturePath, researchSkipReason } from './research-capture-paths.mjs';
@@ -30,7 +31,7 @@ export const HIDE_PRESETS = Object.freeze({
   transient: Object.freeze(['puffs', 'sparks']),
   allFamilies: Object.freeze([...MOVING_FAMILIES, 'puffs', 'sparks']),
   // Systems later build steps add (the clone does not have them yet), hidden alike on both sites.
-  cloneMissing: Object.freeze(['sheep', 'water', 'clouds', 'balloon', 'birds', 'stationFigures']),
+  cloneMissing: Object.freeze(['water', 'clouds', 'balloon', 'birds', 'stationFigures']),
 });
 
 export function findMissingReferences(shots = PARITY_SHOTS, researchDir = resolveResearchDir()) {
@@ -110,6 +111,7 @@ export const PARITY_SHOTS = Object.freeze([
   shot('station-free-start-day', FOREST, '3d', '07-free-camera.png', STATION_FREE_START),
   shot('station-free-start-night', FOREST, '3d', '17-night-overview-zoomed.png', { ...STATION_FREE_START, timeOfDay: 'night' }),
   ...cameraModeShots(FOREST),
+  ...sheepFlockShots(FOREST),
   shot('overview-day', FULL, '3d', '14-overview-day-settled.png', SETTLED),
   shot('overview-evening', FULL, '3d', '03-overview-evening.png', { ...SETTLED, timeOfDay: 'evening' }),
   shot('overview-night', FULL, '3d', '04-overview-night.png', { ...SETTLED, timeOfDay: 'night' }),

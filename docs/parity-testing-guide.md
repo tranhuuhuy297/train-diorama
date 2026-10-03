@@ -44,6 +44,7 @@ compare report writes `referencePath: null`.
 | `original-simulation-oracle.mjs` | `createOriginalSimulation({world})`, `stepOriginalFrame(ctx, dt)`, `setOriginalMode`, `snapshotSimulation`, `runWithSeededMathRandom(seedOrGenerator, fn)` (a seed restarts mulberry32 per call; a generator function keeps one stream running across calls), `withCapturedConsole(fn)`, `ORACLE_MATH_RANDOM_SEED` |
 | `oracle-camera-controls-stub.mjs` | `cameraRig()` → `{camera, controls, firstPersonControls}` stubs (home pose, reset semantics only), shared by the oracle and the clone driver |
 | `clone-simulation-driver.mjs` | `createCloneSimulation({world})` (ctx with the oracle's shape: sim fields, `cameraRig()` stubs, `puffTimer` accessor onto the pool; `world` defaults to a clone World), `stepCloneFrame(ctx, dt)`, `snapshotTrainState(ctx)` |
+| `sheep-flock-parity-lockstep.mjs` | `firstSheepFlockMismatch(original, clone)` → null or `{sheepIndex, field, original, clone}` (in place, `Object.is`: count, state fields, orientation, route fields, the three raw instance arrays); `runSheepLockstep({frames, stepOriginal, stepClone, beforeFrame, compare})` → `{mismatch: {frame, …} \| null, logs: {original, clone}}` (per-side `mulberry32(20260930)` Math.random and `[SHEEP]` log buffers, restored in `finally`) |
 | `smoke-puff-behaviour-checks.mjs` | `trackPuffs(ctx, dt)` → log with `record(frame)` (call after each step: spawns with the interval the pool saw, live counts, emission gate, speed); `assertPuffBehaviour(log, {expectedDwellGaps})` |
 | `fresh-process-train-material-ids.mjs` | `freshProcessTrainMaterialRows('clone' \| 'original')` → per mesh `[material id − smallest, type, name]` from a `new Train()` built in a child node process (cold npr caches); `buildTrainMaterialRows(side)` is what the child runs |
 | `quantised-number-hashing.mjs` | `quantise`, `hashNumbers(values, scale)` (two-lane FNV over quantised words), `hashString` |
@@ -232,9 +233,10 @@ nor skirt (`STRATA` define) nor one of the flat world-core signatures `uColor he
 `3f2a1f|0.1` plinth trim, `b8432f|0.12` red, `8a2f24|0.1` dark red, `b9ae98|0.35` stone; on the
 full original it keeps exactly the 53 core children). Presets: `skyOnly`, `transient`,
 `allFamilies` (every family above except `world`/`allButWorldCore`, plus the transients) and
-`cloneMissing` (`sheep`, `water`, `clouds`, `balloon`, `birds`, `stationFigures`: the systems later
+`cloneMissing` (`water`, `clouds`, `balloon`, `birds`, `stationFigures`: the systems later
 build steps add, hidden alike on both sites; on the clone it only touches World init's empty,
-unattached balloon group). The in-page
+unattached balloon group; `sheep` left the preset when the flock landed, so every masked shot now
+compares the sheep). The in-page
 function lives in `page-hide-set-application.mjs`; restores run in reverse order so overlapping
 sets give back the original visibility.
 
@@ -257,6 +259,22 @@ full scene is compared with only the not-yet-built systems masked; deterministic
 | `trees-sway-t1` | 0 | 12b pose, `uniformTimeOffset: 5`; relation differs from t0 (≥ 0.05 %) | 12b-overview-zoomed-orbited |
 | `trees-sway-hold` | 0 | as t1 + `holdPausedFrames: 20`; relation identical to t1 | – |
 | `trees-debug-hidden` | 180 | overview home, `debugLayerOff: 'Trees'` | 14-overview-day-settled |
+
+Sheep shots (`sheep-flock-parity-shots.mjs`; same stage, hide `cloneMissing` + `transient`,
+deterministic thresholds, in-page pose `sheepFlockCloseup` = rail sheep 2's center − outward·9 +
+(0, 5, 0) + tangent·3, looking at center + (0, 0.5, 0); both sites build it from their own route,
+which the probe proves equal):
+
+| Shot | Time of day | Frames stepped | Shows |
+|---|---|---|---|
+| `sheep-flock-day-closeup` | day | 120 | the three rail sheep grazing on the track |
+| `sheep-flock-night-closeup` | night | 600 | night colours (rail sheep stay awake) |
+| `sheep-track-hop-1` | day | K2 − 12 = 812 | sheep 2 crouching before its hop |
+| `sheep-track-hop-2` | day | K2 + 20 = 844 | sheep 2 mid-hop |
+| `sheep-track-hop-3` | day | K2 + 90 = 914 | sheep 2 waiting on its safe spot |
+
+K2 (`SHEEP_HOP_K2`, 824) is the probe's hop frame for sheep 2; the probe fails if the measured K2
+differs from the pinned value, so re-measure and update the constant if train or sheep timing changes.
 
 `station-free-start-day` / `-night` (free-camera start pose, FOV 65, train parked away, hide
 `cloneMissing` + `train` + `transient`; references 07 and 17) moved here from the shell stage and
@@ -379,7 +397,16 @@ The sky-only diff compares only calls/triangles; default compares everything.
 `residentMeshCount` (meshes under `villageResidents.residents[].home`), `exclusionCount` and
 `hasSheepFlock`. Judged in every scenario as `PASS|FAIL forest <scenario>`: the three counts must be
 equal and the exclusion delta must be −3 per site lacking the flock's three trackside clearings
-(−3 now, 0 once the clone builds the sheep).
+(0 now that both sites build the flock).
+`sheep` (`sheep-flock-runtime-probe.mjs`; its own fresh frozen page per site, default shot state,
+no hide sets): `counts` (body, leg, ear instance counts), `routes` (id, distance, center, outward,
+tangent per rail sheep, unrounded), `firstPasture` (x, z of the first three pasture sheep),
+`strandingCandidates` (pasture sheep within 2.2 of a clearing: the null-height sink candidates) and
+`hopFrames` K1..K3: the world update is wrapped in the page, then 4000 frames are stepped at 1/60 s
+from the first step after the preamble; Ki is the first frame route i enters `escaping` in an
+episode whose startle (or same-step startle + jump) began after frame 60. Printed as `PASS|FAIL
+sheep probe: hop frames [K1,K2,K3]`; every field must be equal, all three hops found, and K2 must
+equal `SHEEP_HOP_K2`.
 
 Post synthetic-input probe: a 64×64 colour ramp and a two-level float depth texture go through
 each site's post material for 18 combinations of outline × (night, saturation) × (pixel,
@@ -629,3 +656,29 @@ open, `body.hud-hidden`) are identical on both sites.
   `THREE.PointerLockControls: Unable to use Pointer Lock API` and an uncaught "options … not
   supported" rejection on both sites (kept quirk); use the headed checklist above.
 
+
+### Sheep flock (P11, 2026-10-03)
+
+- Node: `tests/parity/sheep-flock-parity.test.mjs` at `stopAfter: 'buildRocksAndSheep'`: the next
+  5 `world.rand()` draws, the 10 000-point `sheepGroundAt` grid (values and normals, sentinel
+  (7, 7, 7) normals prove written-on-slope-fail and untouched-on-early-return), every sheep state,
+  route and the three instance buffers (`firstSheepFlockMismatch`), the clearing (frame 348, side
+  −1) and route vectors, the 41 exclusions, the three layer signatures and the whole `world.group`
+  (multiset and ordered; only the original's station figures excluded) are identical; 24 pasture
+  sheep on both sides, no stranding candidates. Then 60 s against a synthetic train circling at
+  7.5 m/s, compared on every frame with identical `[SHEEP]` (frame, line) sequences.
+  `tests/parity/sheep-flock-oracle-train-parity.test.mjs` steps the original sim oracle and the
+  clone driver in lockstep (per-side `mulberry32(20260930)` Math.random): 260 s with the night
+  schedule written through `uNight` (day to 180 s, 3 s ramp, full night to 240 s, 20 s wake; both
+  drivers copy it into `world.nightAmount` unchanged), 90 s at speedMul 2.5 and 60 s of 0.1 s steps
+  (0.05 s frames at time scale 2, where sheep 1 logs only its jump). Every frame matches bit for bit
+  (about 11 s in all). The FSM unit test fuzzes 3 × 20 000 steps against the original state machine.
+- Browser: the five sheep shots are pixel-identical (mean 0.000, max channel diff 0), and the
+  masked forest shots, camera shots and station free starts, which now include the sheep, still
+  match (max channel diff ≤ 1).
+- Probe: sheep counts 27 / 108 / 54, routes at 77.380 / 79.930 / 83.130 m, first pasture sheep and
+  0 stranding candidates equal on both sites; hop frames K = [785, 824, 840] on both sites. The
+  forest section's exclusion delta is now 0. Clone frozen default 1010 calls / 1,681,318 triangles
+  / 363 geometries / 5 textures / 20 programs (original 1373 / 1,762,696 / 419 / 6 / 25); sky-only
+  equal, station probe equal on the first attempt, post synthetic probe max diff 0, every check
+  passes on both sites.
