@@ -15,6 +15,8 @@ const WORLD_CORE_IDS = ['world-core-overview', 'world-core-bridge'];
 const VILLAGE_IDS = ['village-windmill-overview-day', 'village-windmill-zoomed-day', 'village-windmill-evening', 'village-windmill-zoomed-night'];
 const FOREST_IDS = ['overview-day-settled-masked', 'overview-zoomed-orbited-masked', 'overview-night-masked', 'village-residents-yard',
   'trees-sway-t0', 'trees-sway-t1', 'trees-sway-hold', 'trees-debug-hidden', 'station-free-start-day', 'station-free-start-night'];
+const CAMERA_IDS = ['train-camera-day', 'bridge-camera-day', 'bridge-camera-evening', 'free-camera-day', 'train-camera-night']
+  .flatMap(id => [id, `${id}-relaxed`]);
 // Shell-and-sky stage, in shot-list order.
 const SHELL_IDS = [
   'sky-day', 'sky-evening', 'sky-night', 'sky-day-pixel360', 'sky-day-ink-off', ...SKY_DIRECTION_IDS,
@@ -29,9 +31,10 @@ describe('shot list and research captures', () => {
     assert.equal(selectShots({ stage: 'train' }).length, SHELL_IDS.length + 3 + TRAIN_ONLY_IDS.length);
     assert.deepEqual(selectShots({ stage: 'train' }).map(shot => shot.id).slice(-TRAIN_ONLY_IDS.length), TRAIN_ONLY_IDS);
     assert.deepEqual(selectShots({ stage: 'village-and-windmill' }).map(shot => shot.id).slice(SHELL_IDS.length + 3 + TRAIN_ONLY_IDS.length), VILLAGE_IDS);
-    assert.deepEqual(selectShots({ stage: 'residents-and-forest' }).map(shot => shot.id).slice(-FOREST_IDS.length), FOREST_IDS);
+    const forestStage = selectShots({ stage: 'residents-and-forest' }).map(shot => shot.id);
+    assert.deepEqual(forestStage.slice(-(FOREST_IDS.length + CAMERA_IDS.length)), [...FOREST_IDS, ...CAMERA_IDS]);
     const strictCount = 30 + SKY_DIRECTION_IDS.length + WORLD_CORE_IDS.length + STATION_CLOSEUP_IDS.length + TRAIN_ONLY_IDS.length
-      + VILLAGE_IDS.length + FOREST_IDS.length;
+      + VILLAGE_IDS.length + FOREST_IDS.length + CAMERA_IDS.length;
     assert.equal(selectShots({ stage: 'full-scene' }).length, strictCount);
     assert.deepEqual(selectShots({ ids: ['hud-day', 'sky-day'] }).map(shot => shot.id), ['hud-day', 'sky-day']);
     assert.throws(() => selectShots({ ids: ['nope'] }), /Unknown parity shot/);

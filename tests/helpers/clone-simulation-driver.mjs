@@ -7,7 +7,7 @@ import { installMinimalDomShim } from './minimal-dom-shim.mjs';
 import { cameraRig } from './oracle-camera-controls-stub.mjs';
 import { LIGHTING_UNIFORMS } from '../../src/materials/shared-lighting-uniforms.js';
 import { stepSimulation } from '../../src/engine/simulation-step.js';
-import { updateCameraRig } from '../../src/engine/cameras/camera-mode-director.js';
+import { setCameraMode, updateCameraRig } from '../../src/engine/cameras/camera-mode-director.js';
 import { Train } from '../../src/train/train.js';
 import { BrakeSparks } from '../../src/train/brake-sparks.js';
 import { LocomotiveSmokePuffPool } from '../../src/train/locomotive-smoke-puff-pool.js';
@@ -39,6 +39,8 @@ export async function createCloneSimulation({ world = null } = {}) {
     updateTrain(dt) { return updateTrainAndEffects(this, dt); },
     ...cameraFields(),
   };
+  const freeStart = builtWorld.freeCameraStart;
+  ctx.freeCameraPose = { position: freeStart.position.clone(), target: freeStart.target.clone() };
   ctx.train = new Train();
   scene.add(ctx.train.group);
   ctx.brakeSparks = new BrakeSparks(builtWorld.heightAt.bind(builtWorld));
@@ -54,6 +56,11 @@ export async function createCloneSimulation({ world = null } = {}) {
   ctx.camPos.copy(ctx.camera.position);
   ctx.camTarget.copy(ctx.controls.target);
   return ctx;
+}
+
+/** Clone camera-mode switch on the driver ctx (the oracle side uses setOriginalMode). */
+export function setCloneMode(ctx, mode) {
+  setCameraMode(ctx, mode);
 }
 
 /** Oracle and frame-loop order: night amount, gated sim at dt·timeScale, camera rig, cloud camera, matrices. */

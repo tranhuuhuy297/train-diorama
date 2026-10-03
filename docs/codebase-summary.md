@@ -49,8 +49,10 @@ train-diorama/
 │   │   ├── parity-test-hook.js                  installParityTestHook: ?parity / ?parity=freeze + build info
 │   │   └── cameras/
 │   │       ├── overview-orbit-camera.js         OrbitControls config, intro prepare/step, double reset
-│   │       ├── free-fly-pointer-lock-camera.js  PointerLockControls creation (completed in a later phase)
-│   │       └── camera-mode-director.js          CAMERA_FOV, setCameraMode, updateCameraRig
+│   │       ├── free-fly-pointer-lock-camera.js  PLC creation, click-to-lock, WASD/Space/C/Shift flight + clamps, pose save/restore, dispose
+│   │       ├── train-fly-along-camera-rig.js    FLY_ALONG, wide-shot blend, side entry, rig transport, canopy/terrain floors, height response
+│   │       ├── bridge-tripod-camera.js          BRIDGE_TRIPOD, clamped pan toward the track point under the train
+│   │       └── camera-mode-director.js          CAMERA_FOV, setCameraMode (validate → intro → save → enter), updateCameraRig (shared glide)
 │   ├── core/
 │   │   ├── disable-three-color-management.js    ColorManagement.enabled = false side effect
 │   │   ├── seeded-prng-and-gradient-noise.js     mulberry32, stream-A tables, noise2, fbm, smoothstep, lerp
@@ -154,6 +156,8 @@ train-diorama/
 │       ├── parity-shot-list.mjs                 stages, thresholds, hide sets/presets, shots, validation (relations, in-page poses)
 │       ├── research-capture-paths.mjs           research-dir resolver, capture paths, skip reason
 │       ├── parity-shot-factory-and-camera-poses.mjs shot() record factory + defaults, home/zoomed/chase/bridge poses
+│       ├── camera-mode-parity-shots.mjs         camera-mode shots (side/bridge/orbit), strict + relaxed twins
+│       ├── camera-ui-runtime-probe.mjs          parity:probe --camera-ui: mode keys, toasts, glide/snap, click-to-lock, flight-key capture
 │       ├── shot-region-projection.mjs           named regions (village, windmill): page-side projection, device crops, selection
 │       ├── capture-parity-shots.mjs             CLI parity:capture (sessions, PNG + meta incl. regions), prepareShotScene
 │       ├── compare-parity-shots.mjs             CLI parity:compare (metrics, per-region crops, heatmaps, meta warnings, report)
@@ -178,7 +182,7 @@ train-diorama/
 │   │   ├── scene-graph-signature.mjs            DFS signatures, multiset/ordered compare
 │   │   ├── scene-signature-key-builders.mjs     material/geometry/instance/texture keys
 │   │   ├── clone-world-factory.mjs              createCloneWorld(options), WORLD_CORE_SKIP (CM off + DOM shim first)
-│   │   ├── clone-simulation-driver.mjs          createCloneSimulation (oracle ctx shape), stepCloneFrame, snapshotTrainState
+│   │   ├── clone-simulation-driver.mjs          createCloneSimulation (oracle ctx shape, freeCameraPose), setCloneMode, stepCloneFrame, snapshotTrainState
 │   │   ├── smoke-puff-behaviour-checks.mjs      trackPuffs + assertPuffBehaviour: spec-formula smoke gaps, lifetimes, steady state
 │   │   └── fresh-process-train-material-ids.mjs Train material id rows from a child process (cold npr cache)
 │   ├── unit/
@@ -196,6 +200,8 @@ train-diorama/
 │   │   ├── train-station-motion-controller.test.mjs     motion: cruise, justLeft window, √ profile, snap, dwell, laps, strength, smoke interval
 │   │   ├── shadow-post-and-render-pipeline-passes.test.mjs post uniforms, shadow pass, render pipeline order + headlight uniforms
 │   │   ├── overview-intro-and-camera-modes.test.mjs     controls config, intro easing/logs, double reset, modes
+│   │   ├── camera-mode-director-switching.test.mjs      setCameraMode: validation, intro interrupt, free-pose save/restore, side entry, FOV/flags
+│   │   ├── free-fly-fly-along-and-bridge-camera-rigs.test.mjs camera constants, wide-shot blend, bridge pan, free flight clamps, side rig, click-to-lock, dispose
 │   │   ├── parity-harness-pure-logic.test.mjs           hook, patch, perf text, metrics, shim, signatures
 │   │   ├── parity-shot-list-selection-and-stages.test.mjs shot validation, stage gating, selection, hide expansion, research dir
 │   │   ├── parity-compare-meta-warnings.test.mjs        compareMetas: run/env, capability, world-gated timing+font, cloud warnings
@@ -216,7 +222,8 @@ train-diorama/
 │       ├── train-model-and-motion-parity.test.mjs       train goldens; signature, id order, byte-equal merged buffers, update(world, s) ×1000 vs original
 │       ├── train-simulation-oracle-and-composition-parity.test.mjs 18000-frame oracle A/B (original/clone World), composition, headlight, behaviour
 │       ├── village-windmill-parity.test.mjs             village/windmill vs original: draw index, transforms, smoke, glows, pads, shrubs, signatures, 600 frames
-│       └── residents-trees-rocks-parity.test.mjs        clone log timing; original: yards, tree/rock buffers, canopy grid + queries, stream, resident poses, world.group
+│       ├── residents-trees-rocks-parity.test.mjs        clone log timing; original: yards, tree/rock buffers, canopy grid + queries, stream, resident poses, world.group
+│       └── camera-modes-parity.test.mjs                 11 708 frames vs the oracle: side sweep, train rig, bridge, free flight clamps, pose save/restore
 └── docs/                                        this file, the other skeleton docs, parity-testing-guide.md
 ```
 
@@ -233,4 +240,5 @@ train-diorama/
 | P07 | Train model, station-stop motion, smoke puffs, brake sparks, headlight | Complete |
 | P08 | Village cottages, chimney smoke, shrubs, windmill (build steps 7–8, update slots 8–9) | Complete |
 | P09 | Village residents, forest + canopy grid, riverside rocks (build steps 10–12, update slots 5–6) | Complete |
-| P10–P14 | Free-fly camera, sheep, water/clouds/balloon, station travellers/birds, ship | Pending (see `development-roadmap.md`) |
+| P10 | Camera modes: free fly (pointer lock), train fly-along rig, bridge tripod | Complete (headed pointer-lock check pending) |
+| P11–P14 | Sheep, water/clouds/balloon, station travellers/birds, ship | Pending (see `development-roadmap.md`) |

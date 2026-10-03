@@ -9,7 +9,7 @@ const overview = { mode: 'overview', flightLocked: false };
 test('flight capture wins over filters while orbit and locked', () => {
   const ctx = { mode: 'orbit', flightLocked: true };
   assert.deepEqual(resolveKeyAction(key({ key: 'w', code: 'KeyW' }), ctx), { type: 'flight-key', code: 'KeyW' });
-  assert.deepEqual(resolveKeyAction(key({ key: ' ', code: 'Space' }), ctx), { type: 'flight-key', code: 'Space' });
+  assert.deepEqual(resolveKeyAction(key({ key: ' ', code: 'Space', repeat: true }), ctx), { type: 'flight-key', code: 'Space' });
   assert.deepEqual(resolveKeyAction(key({ key: 'l', code: 'KeyL' }), ctx), { type: 'log-camera-pose' });
 });
 

@@ -1,12 +1,12 @@
 // Real engine core: renderer, frame loop, palettes, sky, shadows, post, pixel-art resolution,
-// the overview camera, the world and the train. Birds are added later at this facade's reserved slots.
+// the four camera rigs, the world and the train. Birds are added later at this facade's reserved slots.
 import '../core/disable-three-color-management.js';
 import * as THREE from 'three';
 import { LIGHTING_UNIFORMS } from '../materials/shared-lighting-uniforms.js';
 import { PALETTES, applyPalette, beginPaletteTransition, stepPaletteTransition } from './time-of-day-palettes-and-transition.js';
 import { CAMERA_FOV, setCameraMode, updateCameraRig } from './cameras/camera-mode-director.js';
 import { OVERVIEW_HOME, createOverviewControls, bindOverviewIntroInterrupt, prepareOverviewIntro as prepareOverviewIntroPose } from './cameras/overview-orbit-camera.js';
-import { createFirstPersonControls } from './cameras/free-fly-pointer-lock-camera.js';
+import { createFirstPersonControls, bindClickToLock, disposeFirstPersonControls } from './cameras/free-fly-pointer-lock-camera.js';
 import { composeDioramaScene } from './diorama-scene-composition.js';
 import { createShadowDepthPass } from './custom-shadow-depth-pass.js';
 import { createPostPass } from './post-ink-outline-dither-pass.js';
@@ -41,7 +41,7 @@ export class Diorama {
     this.stopTimer = 0;
     this.justLeft = false;
 
-    // Camera-rig state: overview syncs camPos/camTarget; the fly-along vectors wait for the side rig.
+    // Camera-rig state shared by the overview, free, train fly-along and bridge rigs.
     this.camPos = new THREE.Vector3();
     this.camTarget = new THREE.Vector3();
     this.flyAlongElapsed = 0;
@@ -70,6 +70,7 @@ export class Diorama {
     this.controls = createOverviewControls(this);
     bindOverviewIntroInterrupt(this);
     this.firstPersonControls = createFirstPersonControls(this);
+    bindClickToLock(this);
 
     composeDioramaScene(this);
 
@@ -170,9 +171,7 @@ export class Diorama {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
-    if (this.firstPersonControls.isLocked) this.firstPersonControls.unlock();
-    this.renderer.domElement.removeEventListener('click', this.onCanvasClick);
-    this.firstPersonControls.dispose();
+    disposeFirstPersonControls(this);
     this.controls.removeEventListener('start', this.onOverviewInteraction);
     this.controls.dispose();
     this.brakeSparks.dispose();

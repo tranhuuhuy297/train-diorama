@@ -405,6 +405,43 @@ and `frozenAfter30Frames` (hands unchanged after 30 rAF while frozen). Every fie
 across sites; if only the sign hash/font flag differ (font race), both sites are reloaded, at
 most 3 attempts in all. Printed as `PASS|FAIL station probe after N attempt(s)`.
 
+### Camera UI probe (`--camera-ui`)
+
+`npm run parity:probe -- --camera-ui [--target t]` skips every other section and drives one live
+page per site (clone at `?parity`, original through the route hook; no freeze, saved settings
+cleared), from `tools/parity/camera-ui-runtime-probe.mjs`:
+
+1. Picks a canvas point where `document.elementFromPoint` is the canvas (clear of the HUD).
+2. Presses `2, 3, 4, 1, b` and records `{mode, fov, pressed, toast}` after each (expected orbit/65
+   with the exact Free toast, side/48, bridge/42, overview/42, bridge/42 with `B · Bridge camera`),
+   then right-clicks a mode button (overview + `Camera · Default`).
+3. In one `page.evaluate`: overview → bridge plus 5 × `updateCamera(1/60)` (distance to the tripod
+   above 50 after step 1 and strictly falling), overview → side plus one step (`|camPos − tmpA| > 1`,
+   no snap), then orbit (camera exactly on `freeCameraPose.position`).
+4. Spies `firstPersonControls.lock`: a canvas click in orbit gives `[[true]]`, none while `isLocked`
+   is forced true, none in overview.
+5. `movementKeys` gets KeyW, then a PLC `'unlock'` event empties it.
+6. In orbit with `isLocked` forced: keydown w adds KeyW, keyup removes it, Space neither logs
+   `[PAUSE]` nor pauses; unlocked, Space pauses (`[data-toggle="paused"]` `aria-pressed="true"`) and
+   Space again resumes.
+
+Writes `.parity-output/camera-ui-probe.json` (`sites.<target>.result`, `.misses`, `differing`), one
+`camera-ui-probe-<target>.json` per site (`target`, `result`, `misses`) and
+prints `PASS|FAIL <target> camera UI` plus `PASS|FAIL camera UI clone vs original`; any miss or
+cross-site difference sets exit code 1. Quaternions are not compared (mouse moves rotate the camera
+while `isLocked` is forced), and `[CAMERA] Overview intro …` lines are dropped (load timing).
+
+### Manual headed pointer-lock checklist
+
+Headless Chromium rejects `lock(true)` (unadjusted movement) with "not supported on this platform"
+on both sites, so real pointer lock is checked by hand in a headed browser (`npm run dev`).
+Status: not yet run (pending; record the date and browser here once done):
+
+- Press 2, click the scene: the cursor locks.
+- WASD / Space / C / Shift fly; the edge (±61), ground (+1.2) and ceiling (200) clamps hold.
+- Esc: the cursor returns and movement stops (held keys are cleared).
+- 3 glides into the train camera; 4 or B glides to the bridge (B shows its toast); 1 snaps home.
+
 ## 7. Baseline (2026-10-02 re-run, SwiftShader via ANGLE, 1600×900)
 
 | Measure | Original | Clone (sky + shell only) |
@@ -572,3 +609,23 @@ open, `body.hud-hidden`) are identical on both sites.
   calls / 1,657,126 triangles / 360 geometries / 5 textures / 20 programs (original 1373 /
   1,762,696 / 419 / 6 / 25); sky-only equal; station probe equal on the first attempt; post
   synthetic probe max diff 0.
+
+### Camera modes (P10, 2026-10-03)
+
+- Node: `tests/parity/camera-modes-parity.test.mjs` compares 11 708 frames plus every `setMode`
+  against the original oracle (camera position/quaternion/fov, camPos, camTarget, controls target,
+  every fly-along field, the free pose, PLC/controls flags, key count, s, speed): the maximum
+  difference is exactly 0. The sequence covers 6 side entries 7 s apart (side −1 every time), a
+  minute of side mode (wide-shot peak, station dwell, paused, dt 0, time scale 2, dt 0.05), a minute
+  of bridge (controls target = camTarget, goal x within ±4.9), scripted free flight to x ±61, z −61,
+  the ground clamp and the 200 ceiling, no flight while unlocked, and the pose save/restore.
+  Both sides get the same synchronous PLC stub and their own `mulberry32(4242)` Math.random stream.
+- Browser: the five camera shots and their `-relaxed` twins (`cloneMissing` hidden on both sites)
+  are pixel-identical (mean 0.000, max channel diff 0). Framing matches the references (train cam
+  loco right of centre with the coaches trailing up-left; bridge cam low and side-on with the whole
+  train on the deck at 10.5 s; free cam on the platform).
+- Probe: `--camera-ui` passes on both sites and both sites answer identically.
+- Headless pointer lock: a real canvas click in free mode logs
+  `THREE.PointerLockControls: Unable to use Pointer Lock API` and an uncaught "options … not
+  supported" rejection on both sites (kept quirk); use the headed checklist above.
+

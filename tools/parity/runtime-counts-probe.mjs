@@ -2,6 +2,7 @@
 // sites, the station section, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
 // node tools/parity/runtime-counts-probe.mjs [--target t] [--scenario default|sky-only|both] [--profile p] [--strict] [--skip-checks]
 // [--skip-post-probe] [--shot id] (that shot's prepared scene only) [--fields calls,triangles] (renderer fields compared, plus village)
+// [--camera-ui] (live-page camera mode/lock/key probe only; see camera-ui-runtime-probe.mjs)
 import { parseArgs } from 'node:util';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { probeStationState, compareStationAcrossSites } from './station-runtime-
 import { collectVillageWindmillProbe } from './village-windmill-runtime-probe.mjs';
 import { collectForestResidentsProbe, compareForestResidentsProbe } from './forest-residents-runtime-probe.mjs';
 import { diffTargets } from './probe-result-diffing.mjs';
+import { runCameraUiProbe, writeCameraUiReport } from './camera-ui-runtime-probe.mjs';
 
 export { diffProbeResults } from './probe-result-diffing.mjs';
 
@@ -114,7 +116,7 @@ async function main() {
       target: { type: 'string', default: 'both' }, scenario: { type: 'string', default: 'both' },
       profile: { type: 'string', default: 'angle' }, strict: { type: 'boolean', default: false },
       'skip-checks': { type: 'boolean', default: false }, 'skip-post-probe': { type: 'boolean', default: false },
-      shot: { type: 'string' }, fields: { type: 'string' },
+      shot: { type: 'string' }, fields: { type: 'string' }, 'camera-ui': { type: 'boolean', default: false },
     },
   });
   const shot = values.shot ? selectShots({ ids: [values.shot] })[0] : null;
@@ -125,6 +127,7 @@ async function main() {
   const output = { generatedAt: new Date().toISOString(), profile: profileName, targets: {}, diff: null, postSynthetic: null, station: null };
   const postOutputs = {};
   try {
+    if (values['camera-ui']) return void await writeCameraUiReport(await runCameraUiProbe(browser, targets), path.resolve('.parity-output'));
     for (const target of targets) {
       const probed = shot ? await probeShot(browser, target, shot)
         : await probeTarget(browser, target, { scenarios, skipChecks: values['skip-checks'], skipPostProbe: values['skip-post-probe'] });

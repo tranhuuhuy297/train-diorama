@@ -215,7 +215,7 @@ later phases may use in place of the equivalent inline formula.
 diorama.js (facade, owns every field) — constructor order:
   scene+uniforms -> UI state -> clock/motion -> camera-rig state -> scratch/loop
   -> renderer -> camera -> createOverviewControls -> bindOverviewIntroInterrupt
-  -> createFirstPersonControls
+  -> createFirstPersonControls -> bindClickToLock
   -> composeDioramaScene (World, Train, sparks, motion init, sky, puffs, shadow-hidden list, glow registry)
   -> createShadowDepthPass -> createPostPass
   -> setTimeOfDay('day', true) -> ResizeObserver + resize() -> loop(now)
@@ -667,3 +667,78 @@ buildRocksAndSheep(world)                              build step 12 (W5a; W5b s
   `rockCount`, `residentMeshCount`, `exclusionCount`, `hasSheepFlock`) with the rule "counts equal,
   exclusion delta −3 while only the original has the flock"; probe diffing moved to
   `probe-result-diffing.mjs`.
+
+## Camera modes (`src/engine/cameras/`, P10)
+
+```
+UI setMode (hud-state-actions) ──> d.setMode(mode) ──> camera-mode-director.setCameraMode(d, mode)
+  1 own-key check on CAMERA_FOV, else throw 'Invalid camera mode: <mode>'
+  2 overviewIntro set → null + '[CAMERA] Overview intro interrupted by mode selection' (even on a repeat)
+  3 same mode and not overview → return
+  4 leaving orbit → saveFreeCameraPose (position, position + view dir; unlock if locked; keys cleared)
+  5 mode, PLC.enabled (orbit), camera.fov + updateProjectionMatrix, controls.enabled (overview), autoRotate false
+  6 enter: overview → resetOverviewPose | orbit → restoreFreeCameraPose | side → enterFlyAlong | bridge → (glide)
+frame loop ──> d.updateCamera(dt) ──> updateCameraRig(d, dt)          dt = min(0.05, realDt), never time-scaled
+  overview → updateOverviewCamera (return) | orbit → updateFreeFlyCamera (return, no glide)
+  side → computeFlyAlongDesired(d, dt, tmpA, tmpB) → {2, 5} | bridge → computeBridgeDesired → default {2, 2}
+  h0 = camPos.y → camPos.lerp(tmpA, α(dt, 2)) → [side] applyFlyAlongHeight(d, dt, h0, tmpA)
+  → camTarget.lerp(tmpB, α(dt, k)) → camera.position = camPos, lookAt(camTarget) → [bridge] controls.target = camTarget
+canvas 'click' ──> d.onCanvasClick (bindClickToLock): orbit and not locked → firstPersonControls.lock(true)
+dispose ──> disposeFirstPersonControls(d): unlock if locked → remove 'click' listener → PLC.dispose()
+```
+
+| module | exports |
+|---|---|
+| `camera-mode-director.js` | `CAMERA_FOV` {overview 42, orbit 65, side 48, bridge 42}, `setCameraMode`, `updateCameraRig` |
+| `free-fly-pointer-lock-camera.js` | `FREE_CAMERA_VERTICAL_MARGIN` (5°), `FREE_FLY` {speed 12, sprintSpeed 24, edgeInset 1, groundClearance 1.2, ceiling 200}, `createFirstPersonControls`, `bindClickToLock`, `saveFreeCameraPose`, `restoreFreeCameraPose`, `updateFreeFlyCamera`, `disposeFirstPersonControls` |
+| `train-fly-along-camera-rig.js` | `FLY_ALONG` (21 keys), `wideShotBlendAtPhase`, `enterFlyAlong`, `computeFlyAlongDesired`, `applyFlyAlongHeight` |
+| `bridge-tripod-camera.js` | `BRIDGE_TRIPOD` {x −3, y 5.5, z 60, targetXLimit 14, targetXScale 0.35, targetY 8.5, targetZ 36}, `computeBridgeDesired` |
+
+**Diorama fields used by the rigs.** `mode`, `camera`, `controls`, `firstPersonControls`,
+`movementKeys`, `camPos`, `camTarget`, `freeCameraPose` {position, target} (clones of
+`world.freeCameraStart`, set in `composeDioramaScene` right after the world group is added),
+`flyAlongElapsed`, `flyAlongSide`, `flyAlongAnchor`, `flyAlongVelocity`, `previousFlyAlongAnchor`,
+`tmpA` (desired position), `tmpB` (desired target), `onCanvasClick`; read only: `overviewIntro`,
+`autoRotateEnabled`, `paused`, `timeScale`, `s`, `train.loco.obj`, `world.heightAt`,
+`world.treeCanopyHeightAt`, `world.pointAtS`, `renderer.domElement`.
+
+- **Free fly.** While the PLC is locked: inputs W−S, D−A, Space−C (held = 1); if any is non-zero the
+  heading is `right(camera quaternion)·iR + forward·iF`, `y += iU`, normalised, and the camera moves
+  by `heading · (pace·dt)` (24 with either Shift, else 12). Then x and z clamp to ±61 and y to
+  [heightAt(x, z) + 1.2, 200] (x/z already clamped). Clamps run only inside the moving branch, so a
+  restored pose or mouse look is never clamped. camPos/camTarget always mirror the camera.
+- **Train fly-along.** Elapsed advances by the real dt only when not paused and timeScale > 0; phase
+  φ = (e·π)·2. The driver anchor (0, 2.45, −1.4) goes through `loco.localToWorld`; the anchor delta
+  carries camPos and camTarget (velocity = delta.divideScalar(dt) when dt > 0). Wide-shot blend
+  b = ((1 − cos(φ/56))·0.5)³ scales the local offset (σ·(20 + 4 sin(φ/31)), 5 + 2 sin(φ/23),
+  7 sin(φ/41)) by lerp(1, 2, b) before the loco rotation; the canopy look radius is lerp(5, 14, b).
+  The goal is floored at terrain + 3 and at the max canopy under camPos, under the goal and 0.8 s
+  ahead along the velocity, + 1.5. After the position glide, y is replaced by
+  `lerp(h0, goal.y, α(dt, goal.y > h0 ? 3 : 0.7))` and floored at terrain + 3 and the r1 canopy + 1.5.
+  The side σ is chosen once at entry from the sign of (loco right axis)·(loco position); on this
+  loop it is −1 everywhere (outer side).
+- **Bridge tripod.** Goal (−3, 5.5, 60) looking at (clamp(pointAtS(s).x, ±14)·0.35, 8.5, 36), with a
+  module scratch vector for `pointAtS`; it writes `controls.target` every frame.
+- **Lerp flavours.** `Vector3.lerp` (x + (v − x)·α) for camPos/camTarget; `THREE.MathUtils.lerp`
+  ((1 − t)·x + t·y) for the distance multiplier, look radius and height override;
+  α(dt, k) = `exponentialResponse(dt, k)` = 1 − exp((−dt)·k).
+- **Allocation.** No Object3D/Material/Geometry is created by the camera code (three's UUIDs draw
+  Math.random), and nothing is allocated per frame.
+- **Quirks kept for parity:** `lock(true)` (unadjusted movement) has no fallback and its rejection
+  is uncaught; free-cam clamps apply only while moving; rig periods and look-ahead use real dt and
+  ignore timeScale; the bridge overwrites `controls.target`; re-pressing 2 in free mode re-logs,
+  re-toasts and re-saves settings without touching the camera; the fly-along side is chosen once at
+  entry.
+
+### Parity tooling additions (modification-map entries)
+
+- `tests/helpers/clone-simulation-driver.mjs`: ctx gains `freeCameraPose` and `setCloneMode(ctx, mode)`
+  (delegates to `setCameraMode`); `stepCloneFrame` already ends with `updateCameraRig(ctx, dt)`
+  (unscaled dt) → `updateCloudCamera?.` → `updateMatrixWorld`.
+- `tools/parity/camera-mode-parity-shots.mjs` (new; the shot list stays under its line budget):
+  `cameraModeShots(stage)` → `train-camera-day` (side, 6.5 s), `bridge-camera-day` (6 s),
+  `bridge-camera-evening` (10.5 s), `free-camera-day` (orbit, 6 s), `train-camera-night` (side, 9 s),
+  each strict (hide `cloneMissing` + `transient`) plus a `-relaxed` twin (hide `cloneMissing`,
+  transient thresholds); stage `residents-and-forest`.
+- `tools/parity/camera-ui-runtime-probe.mjs` (new): `parity:probe -- --camera-ui` (see the parity
+  testing guide).

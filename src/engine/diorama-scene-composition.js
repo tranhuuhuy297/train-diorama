@@ -1,5 +1,5 @@
-// Scene content in insertion order: world, train, brake sparks (then motion init), sky dome, smoke
-// puffs, the shadow-hidden list and the night-glow registry. Insertion order sets material ids and
+// Scene content in insertion order: world, free-camera pose, train, brake sparks (then motion init),
+// sky dome, smoke puffs, the shadow-hidden list and the night-glow registry. Insertion order sets material ids and
 // glow order; the registry collection stays last so it sees every glow inserted before it.
 import * as THREE from 'three';
 import { World } from '../world/world.js';
@@ -13,6 +13,9 @@ import { collectNightLightGlows } from './night-light-glow-registry.js';
 export function composeDioramaScene(d) {
   d.world = new World();
   d.scene.add(d.world.group);
+  // Free camera starts on the platform; clones draw no UUIDs, so the random stream is untouched.
+  const freeStart = d.world.freeCameraStart;
+  d.freeCameraPose = { position: freeStart.position.clone(), target: freeStart.target.clone() };
 
   d.train = new Train();
   d.scene.add(d.train.group);

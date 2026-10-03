@@ -30,6 +30,10 @@ test('composeDioramaScene inserts world, train, sparks, sky and puffs in order w
   assert.ok(d.nightGlows.slice(-6).every((glow, index) => glow === trainGlows[index]));
   assert.ok(d.nightGlows.slice(0, -6).every(glow => !trainGlows.includes(glow)));
 
+  for (const key of ['position', 'target']) {
+    assert.deepEqual(d.freeCameraPose[key].toArray(), d.world.freeCameraStart[key].toArray());
+    assert.notEqual(d.freeCameraPose[key], d.world.freeCameraStart[key], 'pose owns its vectors');
+  }
   assert.equal(d.s, d.world.stationS + 1);
   assert.equal(d.speed, 2);
   assert.equal(d.justLeft, true);

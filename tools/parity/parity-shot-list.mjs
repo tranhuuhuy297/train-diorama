@@ -5,6 +5,7 @@ import { PALETTES } from '../../src/engine/time-of-day-palettes-and-transition.j
 import { shot, ZOOMED, ZOOMED_ORBITED, LOCO_CHASE, BRIDGE_VIEW, lookFromTarget, locoView } from './parity-shot-factory-and-camera-poses.mjs';
 import { REGION_NAMES } from './shot-region-projection.mjs';
 import { IN_PAGE_CAMERA_POSES } from './page-shot-actions.mjs';
+import { cameraModeShots } from './camera-mode-parity-shots.mjs';
 import { resolveResearchDir, researchCapturePath } from './research-capture-paths.mjs';
 
 export { resolveResearchDir, researchCapturePath, researchSkipReason } from './research-capture-paths.mjs';
@@ -108,6 +109,7 @@ export const PARITY_SHOTS = Object.freeze([
   shot('trees-debug-hidden', FOREST, '3d', '14-overview-day-settled.png', { ...MASKED, debugLayerOff: 'Trees' }),
   shot('station-free-start-day', FOREST, '3d', '07-free-camera.png', STATION_FREE_START),
   shot('station-free-start-night', FOREST, '3d', '17-night-overview-zoomed.png', { ...STATION_FREE_START, timeOfDay: 'night' }),
+  ...cameraModeShots(FOREST),
   shot('overview-day', FULL, '3d', '14-overview-day-settled.png', SETTLED),
   shot('overview-evening', FULL, '3d', '03-overview-evening.png', { ...SETTLED, timeOfDay: 'evening' }),
   shot('overview-night', FULL, '3d', '04-overview-night.png', { ...SETTLED, timeOfDay: 'night' }),

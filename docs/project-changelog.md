@@ -1,5 +1,45 @@
 # Project changelog
 
+## [0.10.0] - 2026-10-03
+
+feat(camera): free-fly pointer-lock camera, train fly-along rig and bridge tripod.
+
+### Added
+
+- `src/engine/cameras/train-fly-along-camera-rig.js`: `FLY_ALONG` (21 keys), `wideShotBlendAtPhase`,
+  `enterFlyAlong` (elapsed reset, outer side from the loco right axis, anchor priming),
+  `computeFlyAlongDesired` (rig transport with the driver anchor, velocity, 31/23/41 s sines, 56 s
+  wide shot, terrain and 3-sample canopy floors with 0.8 s look-ahead; returns the frozen {2, 5}),
+  `applyFlyAlongHeight` (rise 3 / sink 0.7, terrain and r1 canopy floors).
+- `src/engine/cameras/bridge-tripod-camera.js`: `BRIDGE_TRIPOD`, `computeBridgeDesired` (scratch
+  `pointAtS`, clamp ±14 then × 0.35).
+- `free-fly-pointer-lock-camera.js`: `FREE_FLY`, `bindClickToLock`, `saveFreeCameraPose`,
+  `restoreFreeCameraPose`, `updateFreeFlyCamera` (WASD/Space/C, Shift 24 u/s, clamps ±61 and
+  [ground + 1.2, 200] only while moving), `disposeFirstPersonControls`.
+- `d.freeCameraPose` (clones of `world.freeCameraStart`) right after the world in the composition.
+- Tests: `tests/unit/camera-mode-director-switching.test.mjs`,
+  `tests/unit/free-fly-fly-along-and-bridge-camera-rigs.test.mjs`,
+  `tests/parity/camera-modes-parity.test.mjs` (exact vs the original over 11 708 frames).
+- Parity tooling: `tools/parity/camera-mode-parity-shots.mjs` (`train-camera-day`,
+  `bridge-camera-day`, `bridge-camera-evening`, `free-camera-day`, `train-camera-night`, each with a
+  `-relaxed` twin; stage `residents-and-forest`), `tools/parity/camera-ui-runtime-probe.mjs`
+  (`parity:probe -- --camera-ui`), `setCloneMode` in the clone simulation driver.
+  The probe writes the combined `camera-ui-probe.json` plus `camera-ui-probe-<target>.json` per site.
+
+### Changed
+
+- `camera-mode-director.js`: final `setCameraMode` (free pose saved on leaving orbit, per-mode
+  entry) and `updateCameraRig` (shared glide tail; bridge writes `controls.target`).
+- `diorama.js`: `bindClickToLock` right after the PLC is created; `dispose` goes through
+  `disposeFirstPersonControls`.
+- `keyboard-shortcut-resolution.test.mjs`: a repeated Space while locked in orbit is still a flight key.
+
+### Pending
+
+- Manual headed pointer-lock checklist (docs/parity-testing-guide.md) not yet run; headless
+  Chromium rejects `lock(true)`, so real lock, Esc release and WASD flight are unverified in a
+  real browser.
+
 ## [0.9.0] - 2026-10-02
 
 feat(world): village residents with their walk cycle, the instanced forest with its canopy height

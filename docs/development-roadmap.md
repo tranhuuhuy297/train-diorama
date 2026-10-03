@@ -14,7 +14,7 @@ next phase starts. Dependencies are listed as the phases whose output a phase re
 | P07 | Train model and motion | P02, P05 | Complete |
 | P08 | Village and windmill | P06, P07 | Complete |
 | P09 | Village residents, trees, rocks | P05, P08 | Complete |
-| P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Pending |
+| P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Complete (headed pointer-lock check pending) |
 | P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Pending |
 | P12 | Water, clouds, balloon | P05 | Pending |
 | P13 | Station travellers, birds | P06, P09 | Pending |
@@ -109,3 +109,15 @@ strict) match the original (mean diff 0.000, max channel
 diff ≤ 1), sway animates
 and freezes while paused on both sites, and the probe's tree, rock and resident counts match.
 `ACTIVE_PARITY_STAGE` is now `residents-and-forest`.
+
+P10 completes the camera-mode director. Free mode (key 2) locks the pointer on a canvas click and
+flies with WASD, Space/C and Shift, clamped to the diorama box and above the ground only while
+moving; its pose is saved on leaving and restored on return, starting from the station platform.
+The train camera (key 3) hangs a rig off the driver's cab that drifts on 31/23/41 s sines, pulls
+out to a wide shot every 56 s and climbs over hills and tree tops with a 0.8 s look-ahead; the
+bridge camera (key 4 / B) is a riverbank tripod that pans after the train. Side and bridge glide
+in; overview and free mode snap. Node parity against the original is exact (0 difference over
+11 708 frames covering every mode, the wide-shot peak, the station dwell, pause, dt 0, time scale
+2 and every free-flight clamp), and the `--camera-ui` browser probe answers identically on both
+sites. Still pending: the manual headed pointer-lock checklist (real lock, Esc release, WASD flight;
+headless Chromium rejects `lock(true)`), see docs/parity-testing-guide.md.
