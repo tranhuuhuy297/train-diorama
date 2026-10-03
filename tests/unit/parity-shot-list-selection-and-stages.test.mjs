@@ -18,6 +18,8 @@ const FOREST_IDS = ['overview-day-settled-masked', 'overview-zoomed-orbited-mask
 const CAMERA_IDS = ['train-camera-day', 'bridge-camera-day', 'bridge-camera-evening', 'free-camera-day', 'train-camera-night']
   .flatMap(id => [id, `${id}-relaxed`]);
 const SHEEP_IDS = ['sheep-flock-day-closeup', 'sheep-flock-night-closeup', 'sheep-track-hop-1', 'sheep-track-hop-2', 'sheep-track-hop-3'];
+const WATER_SKY_IDS = ['overview-zoomed-day-masked', 'overview-zoomed-night-masked', 'overview-day-waterfall-roi', 'balloon-closeup-day',
+  'balloon-closeup-night', 'water-closeup-day', 'water-closeup-night', 'waterfall-closeup-day', 'waterfall-closeup-night', 'clouds-debug-hidden'];
 // Shell-and-sky stage, in shot-list order.
 const SHELL_IDS = [
   'sky-day', 'sky-evening', 'sky-night', 'sky-day-pixel360', 'sky-day-ink-off', ...SKY_DIRECTION_IDS,
@@ -33,7 +35,7 @@ describe('shot list and research captures', () => {
     assert.deepEqual(selectShots({ stage: 'train' }).map(shot => shot.id).slice(-TRAIN_ONLY_IDS.length), TRAIN_ONLY_IDS);
     assert.deepEqual(selectShots({ stage: 'village-and-windmill' }).map(shot => shot.id).slice(SHELL_IDS.length + 3 + TRAIN_ONLY_IDS.length), VILLAGE_IDS);
     const forestStage = selectShots({ stage: 'residents-and-forest' }).map(shot => shot.id);
-    const forestTail = [...FOREST_IDS, ...CAMERA_IDS, ...SHEEP_IDS];
+    const forestTail = [...FOREST_IDS, ...CAMERA_IDS, ...SHEEP_IDS, ...WATER_SKY_IDS];
     assert.deepEqual(forestStage.slice(-forestTail.length), forestTail);
     const strictCount = 30 + SKY_DIRECTION_IDS.length + WORLD_CORE_IDS.length + STATION_CLOSEUP_IDS.length + TRAIN_ONLY_IDS.length
       + VILLAGE_IDS.length + forestTail.length;
@@ -54,6 +56,6 @@ describe('shot list and research captures', () => {
   });
   test('every reference PNG exists in the research captures', { skip: researchSkipReason() }, () => {
     assert.deepEqual(findMissingReferences(), []);
-    assert.equal(new Set(PARITY_SHOTS.map(shot => shot.reference).filter(Boolean)).size, 21);
+    assert.equal(new Set(PARITY_SHOTS.map(shot => shot.reference).filter(Boolean)).size, 22);
   });
 });

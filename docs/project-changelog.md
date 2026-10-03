@@ -1,5 +1,46 @@
 # Project changelog
 
+## [0.12.0] - 2026-10-03
+
+feat(world): pond/river water, waterfall, drifting cloud field with camera avoidance, hot-air balloon.
+
+### Added
+
+- `src/materials/water-surface-material.js` (`waterMaterial`: height-texture discard, depth ramp,
+  ripples, shore foam, cloud-shadow tint, night palette, headlight tint) and
+  `src/materials/waterfall-curtain-material.js` (`waterfallMaterial`: scrolling streaks, side foam,
+  foot splash, night blend; DoubleSide).
+- `src/world/water/river-water-and-waterfall-builder.js`: `findWaterfallMouth`,
+  `createWaterfallGeometry` (8 × 24 curtain, 225 vertices / 1152 indices), `buildWater` (step 13).
+- `src/world/sky/cloud-field-spawner.js` (`createCloudSpawners`, `buildClouds`, step 14: 33 clouds,
+  464 instances, the last `world.rand` consumer) and `cloud-drift-fade-and-camera-avoidance.js`
+  (`updateCloudDrift`, `updateCloudCamera`, `CLOUD_CAMERA_BUFFER` 1.5, `CLOUD_RETURN_RESPONSE` 1.8).
+- `src/world/balloon/`: harlequin envelope, 185-box basket, ropes, sandbags, goggled pilot,
+  burner, flickering NIGHT_GLOW flame and burner halo (`buildBalloon`, step 15) and the closed-form
+  flight (`updateBalloonFlight`).
+- Tests: `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs`,
+  `tests/unit/parity-water-clouds-balloon-shots-and-probe.test.mjs`,
+  `tests/parity/water-clouds-balloon-parity.test.mjs` (cold-cache builds, UUID draws 24 / 2128 /
+  2940, fingerprint 0.23735972004942596, 33 clouds bitwise, signatures, materials, 300 s lockstep),
+  helper `tests/helpers/counted-full-world-builds.mjs`.
+- Parity tooling: `tools/parity/water-clouds-balloon-parity-shots.mjs` (10 shots, poses B/W/F),
+  region `waterfall`, `tools/parity/water-clouds-balloon-runtime-probe.mjs` (probe field
+  `waterCloudsBalloon`).
+
+### Changed
+
+- `world-build-steps.js`: steps `buildWater`, `buildClouds`, `buildBalloon` after
+  `buildRocksAndSheep`; registry entries are writable (array still frozen) so tests can wrap a step.
+- `world.js`: `updateCloudCamera(cameraPosition, dt)`.
+- `world-per-frame-update.js`: slots 10 (cloud drift) and 11 (balloon flight); a world stopped
+  before `buildBalloon` now throws in `update`, like the original.
+- `frame-loop-scheduler.js`: frame step 7 `d.world.updateCloudCamera(d.camera.position, dt)` after
+  the camera update, on clamped real dt, also while paused.
+- `tests/helpers/clone-simulation-driver.mjs`: `updateCloudCamera` called unguarded.
+- `parity-shot-list.mjs`: preset `cloneMissing` keeps only birds and station figures; village shots
+  name their regions explicitly. Earlier tests follow (residents/forest suite compares full builds;
+  shot/preset pins updated).
+
 ## [0.11.0] - 2026-10-03
 
 feat(life): sheep flock with pasture grazing, sleep, and the rail sheep that hop clear of the train.

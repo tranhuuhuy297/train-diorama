@@ -16,7 +16,7 @@ next phase starts. Dependencies are listed as the phases whose output a phase re
 | P09 | Village residents, trees, rocks | P05, P08 | Complete |
 | P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Complete (headed pointer-lock check pending) |
 | P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Complete |
-| P12 | Water, clouds, balloon | P05 | Pending |
+| P12 | Water, clouds, balloon | P05 | Complete |
 | P13 | Station travellers, birds | P06, P09 | Pending |
 | P14 | Full-scene parity signature, deployment prep | P01–P13 | Pending |
 
@@ -131,3 +131,18 @@ build after step 12 including the whole `world.group`, 60 s against a synthetic 
 of the real train against the original sim oracle with a night ramp, the fastest train and doubled
 time scale); the five sheep shots are pixel-identical and the probe's sheep section, including the
 hop frames K = [785, 824, 840], matches. `sheep` left the `cloneMissing` preset.
+
+P12 adds the water, the clouds and the balloon. One board-sized quad carries the pond and river: its
+shader keeps only fragments where the baked height texture is below 0.08 and colours them by depth,
+with two-octave ripples, shore foam, cloud shadows, a night palette and the headlight. The river
+falls off the front edge as an 8 × 24 curtain with scrolling streaks, foamy sides and a splash at
+the foot. Thirty-three clouds in three bands (high, far and a low bank below the front edge) drift
+east on sim time, shrink out at the band edges and wrap; on real time, even while paused, a cloud
+the camera flies into is pushed clear and glides back (τ ≈ 0.56 s). The red/cream harlequin balloon
+with its woven basket, goggled pilot and sandbags orbits the board, bobs, spins and flickers its
+burner flame, lit at night by its local glow and a burner halo. Clouds are the last `world.rand`
+consumer: the next draw after a full build is 0.23735972004942596 on both sides, the 33 clouds
+match bit for bit, the whole `world.group` signature matches (only the original's station figures
+excluded), the UUID draws per step are 24 / 2128 / 2940 on both sides, and 300 sim-seconds of
+drift, camera pushes and flight match exactly. The water, waterfall and balloon left the
+`cloneMissing` preset, which now hides only the birds and the station figures.

@@ -1,5 +1,5 @@
-// CLI: renderer.info, key world/sim fields and the exact village/windmill state in the identical frozen state on both
-// sites, the station and sheep sections, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
+// CLI: renderer.info, key world/sim fields, the exact village/windmill and water/cloud/balloon state in the identical
+// frozen state on both sites, the station and sheep sections, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
 // node tools/parity/runtime-counts-probe.mjs [--target t] [--scenario default|sky-only|both] [--profile p] [--strict] [--skip-checks]
 // [--skip-post-probe] [--shot id] (that shot's prepared scene only) [--fields calls,triangles] (renderer fields compared, plus village)
 // [--camera-ui] (live-page camera mode/lock/key probe only; see camera-ui-runtime-probe.mjs)
@@ -19,6 +19,7 @@ import { collectForestResidentsProbe, compareForestResidentsProbe } from './fore
 import { diffTargets } from './probe-result-diffing.mjs';
 import { runCameraUiProbe, writeCameraUiReport } from './camera-ui-runtime-probe.mjs';
 import { probeSheepAcrossSites } from './sheep-flock-runtime-probe.mjs';
+import { collectWaterCloudsBalloonProbe, compareWaterCloudsBalloonProbe } from './water-clouds-balloon-runtime-probe.mjs';
 
 export { diffProbeResults } from './probe-result-diffing.mjs';
 
@@ -66,6 +67,7 @@ function collectRuntimeCounts() {
 
 const countScene = async page => ({
   ...await page.evaluate(collectRuntimeCounts), village: await page.evaluate(collectVillageWindmillProbe), forest: await page.evaluate(collectForestResidentsProbe),
+  waterCloudsBalloon: await page.evaluate(collectWaterCloudsBalloonProbe),
 });
 
 // One shot's scene exactly as the capture prepares it, rendered twice, then counted.
@@ -166,6 +168,9 @@ async function main() {
     const forest = compareForestResidentsProbe(output.targets.original.scenarios[scenario].forest, output.targets.clone.scenarios[scenario].forest);
     console.log(`${forest.pass ? 'PASS' : 'FAIL'} forest ${scenario}: ${forest.pass ? `counts equal, exclusion delta ${forest.exclusionDelta}` : forest.failures.join('; ')}`);
     if (!forest.pass) failures++;
+    const sky = compareWaterCloudsBalloonProbe(output.targets.original.scenarios[scenario].waterCloudsBalloon, output.targets.clone.scenarios[scenario].waterCloudsBalloon);
+    console.log(`${sky.pass ? 'PASS' : 'FAIL'} water/clouds/balloon ${scenario}${sky.pass ? '' : `: ${sky.failures.join('; ')}`}`);
+    if (!sky.pass) failures++;
   }
   if (output.station) {
     const { pass, attempts, differing } = output.station;

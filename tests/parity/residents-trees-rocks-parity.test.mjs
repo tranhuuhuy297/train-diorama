@@ -157,8 +157,8 @@ describe('residents, trees and rocks parity with the original', { skip, timeout:
     }
   });
 
-  test('(C) rocks, whole world.group and exclusions after the rock step', async () => {
-    const original = (await buildOriginalWorld({ stopAfter: 'buildRocksAndSheep' })).world;
+  test('(C) rocks, whole world.group and exclusions (full builds on both sides)', async () => {
+    const original = (await buildOriginalWorld()).world;
     const { world: clone, groupSignature } = fullCloneBuild();
     const [expected, actual] = [rocksOf(original), rocksOf(clone)];
     assert.equal(actual.count, expected.count);

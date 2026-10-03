@@ -24,7 +24,7 @@ describe('residents and forest shots', () => {
   test('stage, masks, poses, actions and freshness', () => {
     assert.equal(ACTIVE_PARITY_STAGE, 'residents-and-forest');
     assert.deepEqual(validateShotList(), []);
-    const masked = ['water', 'clouds', 'balloon', 'birds', 'stationFigures', 'puffs', 'sparks'];
+    const masked = ['birds', 'stationFigures', 'puffs', 'sparks'];
     for (const id of ['overview-day-settled-masked', 'overview-zoomed-orbited-masked', 'overview-night-masked', 'village-residents-yard', 'trees-debug-hidden']) {
       const shot = byId(id);
       assert.deepEqual([shot.stage, shot.thresholdClass, shot.reportOnly, expandHideSets(shot.hide)], ['residents-and-forest', 'deterministic', false, masked]);
@@ -42,22 +42,15 @@ describe('residents and forest shots', () => {
 });
 
 describe('hide sets and in-page actions', () => {
-  test('water hides shader meshes without a flat colour; cloneMissing hides nothing the clone lacks', () => {
+  test('water hides the water and waterfall meshes only; cloneMissing hides nothing the clone lacks', () => {
     const d = { world, scene: new THREE.Scene() };
-    // World init's empty balloon group is not in the scene yet, so hiding it changes nothing.
-    assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: expandHideSets(['cloneMissing']), worldCoreKeys: [] }),
-      { water: 0, clouds: 0, balloon: 1, birds: 0, stationFigures: 0 });
-    assert.equal(world.balloon.parent, null);
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(), new THREE.ShaderMaterial({ uniforms: { uHeight: { value: null } } }));
-    world.group.add(water);
-    try {
-      assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: ['water'], worldCoreKeys: [] }), { water: 1 });
-      assert.equal(water.visible, false);
-      inPage(d, applyHideSetsInPage, { requested: [], worldCoreKeys: [] });
-      assert.equal(water.visible, true);
-    } finally {
-      world.group.remove(water);
-    }
+    assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: expandHideSets(['cloneMissing']), worldCoreKeys: [] }), { birds: 0, stationFigures: 0 });
+    const [water, waterfall] = world.group.children.filter(child => child.isMesh && child.material.uniforms && !child.material.uniforms.uColor);
+    assert.ok(water.material.uniforms.uHeight && waterfall.material.side === THREE.DoubleSide);
+    assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: ['water', 'clouds', 'balloon'], worldCoreKeys: [] }), { water: 2, clouds: 33, balloon: 1 });
+    assert.ok(!water.visible && !waterfall.visible && !world.balloon.visible && world.clouds.every(cloud => !cloud.group.visible));
+    inPage(d, applyHideSetsInPage, { requested: [], worldCoreKeys: [] });
+    assert.ok(water.visible && waterfall.visible && world.balloon.visible && world.clouds.every(cloud => cloud.group.visible));
   });
 
   test('villageResidentYard pose sits in front of the woman, in her home frame', () => {

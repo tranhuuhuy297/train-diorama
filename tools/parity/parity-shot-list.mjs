@@ -7,6 +7,7 @@ import { REGION_NAMES } from './shot-region-projection.mjs';
 import { IN_PAGE_CAMERA_POSES } from './page-shot-actions.mjs';
 import { cameraModeShots } from './camera-mode-parity-shots.mjs';
 import { sheepFlockShots } from './sheep-flock-parity-shots.mjs';
+import { waterCloudsBalloonShots } from './water-clouds-balloon-parity-shots.mjs';
 import { resolveResearchDir, researchCapturePath } from './research-capture-paths.mjs';
 
 export { resolveResearchDir, researchCapturePath, researchSkipReason } from './research-capture-paths.mjs';
@@ -31,7 +32,7 @@ export const HIDE_PRESETS = Object.freeze({
   transient: Object.freeze(['puffs', 'sparks']),
   allFamilies: Object.freeze([...MOVING_FAMILIES, 'puffs', 'sparks']),
   // Systems later build steps add (the clone does not have them yet), hidden alike on both sites.
-  cloneMissing: Object.freeze(['water', 'clouds', 'balloon', 'birds', 'stationFigures']),
+  cloneMissing: Object.freeze(['birds', 'stationFigures']),
 });
 
 export function findMissingReferences(shots = PARITY_SHOTS, researchDir = resolveResearchDir()) {
@@ -55,7 +56,7 @@ const STATION_CLOSEUP = { camera: { relativeTo: 'station', position: [8, 3.5, -6
 const TRAIN_ONLY = ['world', 'birds'];
 const BRAKING_FRONT = { seconds: 36, camera: locoView([4.5, 2.6, 6.5], [0, 1.2, 0.5]) };
 // Village and windmill vs an original with every later build step hidden; judged inside both regions.
-const VILLAGE_VIEW = { seconds: 3, hide: ['unbuiltAfterWindmill', 'transient'], regions: [...REGION_NAMES] };
+const VILLAGE_VIEW = { seconds: 3, hide: ['unbuiltAfterWindmill', 'transient'], regions: ['village', 'windmill'] };
 // Residents, forest and rocks: the full scene with the not-yet-built systems masked on both sites.
 const MASKED = { seconds: 3, hide: ['cloneMissing', 'transient'] };
 // Fresh page each, so the t0 baseline never inherits a parked train from a shared session.
@@ -112,6 +113,7 @@ export const PARITY_SHOTS = Object.freeze([
   shot('station-free-start-night', FOREST, '3d', '17-night-overview-zoomed.png', { ...STATION_FREE_START, timeOfDay: 'night' }),
   ...cameraModeShots(FOREST),
   ...sheepFlockShots(FOREST),
+  ...waterCloudsBalloonShots(FOREST),
   shot('overview-day', FULL, '3d', '14-overview-day-settled.png', SETTLED),
   shot('overview-evening', FULL, '3d', '03-overview-evening.png', { ...SETTLED, timeOfDay: 'evening' }),
   shot('overview-night', FULL, '3d', '04-overview-night.png', { ...SETTLED, timeOfDay: 'night' }),

@@ -738,7 +738,7 @@ dispose ──> disposeFirstPersonControls(d): unlock if locked → remove 'clic
 
 - `tests/helpers/clone-simulation-driver.mjs`: ctx gains `freeCameraPose` and `setCloneMode(ctx, mode)`
   (delegates to `setCameraMode`); `stepCloneFrame` already ends with `updateCameraRig(ctx, dt)`
-  (unscaled dt) → `updateCloudCamera?.` → `updateMatrixWorld`.
+  (unscaled dt) → `updateCloudCamera` (unguarded since P12) → `updateMatrixWorld`.
 - `tools/parity/camera-mode-parity-shots.mjs` (new; the shot list stays under its line budget):
   `cameraModeShots(stage)` → `train-camera-day` (side, 6.5 s), `bridge-camera-day` (6 s),
   `bridge-camera-evening` (10.5 s), `free-camera-day` (orbit, 6 s), `train-camera-night` (side, 9 s),
@@ -831,3 +831,97 @@ updateWorld slot 3 updateSheepFlock(world, elapsed, dt)             sleep → wa
   section `sheep` (see the parity testing guide).
 - `tests/helpers/sheep-flock-parity-lockstep.mjs` (new): `firstSheepFlockMismatch`,
   `runSheepLockstep`.
+
+## Water, clouds and balloon (`src/world/water/`, `src/world/sky/`, `src/world/balloon/`, P12)
+
+```
+build step 13 buildWater(world)       PlaneGeometry(124, 124, 1, 1).rotateX(−π/2) → waterMaterial(heightTex, 124) → Mesh (y 0)
+                                       → group + noShadow; mouth = x-range of heights[200·201 + ix] < 0 (ix 92..109:
+                                       −4.96..5.58); if xmin < xmax: curtain geometry → waterfallMaterial() → Mesh → group + noShadow
+build step 14 buildClouds(world)      npr {#ffffff, stipple .22, stippleScale .7} → IcosahedronGeometry(1, 1); spawners A 8 / B 7 / C 18;
+                                       per cloud (W7): blobCount, clusterCount, 8 draws per blob, 4 edge accents (no draws),
+                                       group position (3 draws), speed (1 draw, the cloud's last) → InstancedMesh(blobs + 4),
+                                       colliders, radius, bounding sphere, scale 0 → group; CloudState → world.clouds
+build step 15 buildBalloon(world)     envelope → basket → pilot → ropes/sandbags → mergeStaticGeometry(balloon, {envelope})
+                                       → burner bar + can → balloonFlame (2 NIGHT_GLOW cones, noShadow) → burner glow (noShadow)
+                                       → world.group.add(balloon) (last child, index 110 of 111)
+updateWorld slot 10 updateCloudDrift(world.clouds, dt)      age, +x drift, wrap at x > W/2 (offset zeroed), fade × grow-in
+updateWorld slot 11 updateBalloonFlight(world, elapsed)     orbit (34 cos θ, 27 + 1.2 sin(t/2), 26 sin θ − 4), θ = .035 t; yaw .1 t; flicker
+frame step 7 d.world.updateCloudCamera(d.camera.position, dt)   after updateCamera, before render; clamped real dt, also paused
+```
+
+| module | exports |
+|---|---|
+| `materials/water-surface-material.js` | `WATER_VERTEX_SHADER`, `WATER_FRAGMENT_SHADER`, `waterMaterial(heightTex, size = 124)` |
+| `materials/waterfall-curtain-material.js` | `WATERFALL_VERTEX_SHADER`, `WATERFALL_FRAGMENT_SHADER`, `waterfallMaterial()` |
+| `water/river-water-and-waterfall-builder.js` | `findWaterfallMouth(heights)`, `createWaterfallGeometry(xmin, xmax)`, `buildWater(world)` |
+| `sky/cloud-field-spawner.js` | `createCloudSpawners(windmillRoofHeight)`, `buildClouds(world)` |
+| `sky/cloud-drift-fade-and-camera-avoidance.js` | `CLOUD_CAMERA_BUFFER` 1.5, `CLOUD_RETURN_RESPONSE` 1.8, `updateCloudDrift(clouds, dt)`, `updateCloudCamera(clouds, cameraPosition, dt)` (also `World#updateCloudCamera`) |
+| `balloon/hot-air-balloon-envelope-and-basket.js` | `BALLOON_LOCAL_GLOW`, `BALLOON_ENVELOPE_PROFILE`, `createBalloonEnvelopeGeometry()`, `createBalloonEnvelope`, `buildBalloonBasket`, `buildBalloonRopesAndSandbags` |
+| `balloon/hot-air-balloon-pilot-figure.js` | `buildBalloonPilot(balloon, localGlow)` |
+| `balloon/hot-air-balloon-burner-flame-and-flight.js` | `buildBalloon(world)`, `updateBalloonFlight(world, elapsed)` |
+
+- **Water shader.** h = 12·R − 3 sampled at ((x, z) + 62) / 124 (no half-texel correction);
+  discard when h > 0.08; depth ramp S(.15, 1.5, −h) between shallow and deep; ripple = step(.76,
+  .7·n1 + .3·n2) mixed 0.75 toward the ripple tint; foam where −h + .35·(n − .5) ≤ .18; ×
+  mix(1.1·uShadowTint, 1, shadowAt) (cloud shadows land on the water); night palette by uNight;
+  + headlight × (.48, .65, .75); fog. Uniforms: every G entry, then `uNight`,
+  `uHeadlightPosition`, `uHeadlightDirection` by reference from `NIGHT_UNIFORMS` (no
+  `uSaturation`), then `uHeight`, `uSize`. Unlit, FrontSide, opaque.
+- **Waterfall shader.** Streak noise (14u, 2.5v + 2.2t) and detail (30u, 6v + 3.5t); light/dark
+  blue by streak, white where .6·n + .4·n2 ≥ .72, white sides within .07 + .05·n2, foot splash 1 −
+  S(0, .1, v + .08·(n2 − .5)) (ascending edges; the original's reversed-edge form is the same
+  Hermite), night blend, fog. DoubleSide; uniforms G + `uNight` only (the original's unused
+  headlight pair is left out per the shared-uniform contract; output-identical). Both shaders run
+  on `G.uTime` (sim time), so they freeze while paused.
+- **Camera avoidance.** β = exp(−1.8·dt) once per call; every cloud: offset ·= β, snapped to 0
+  below 1e−10 squared; group = position + offset. Clouds with scale 0 or hidden by the debug menu
+  stop there. Otherwise, within radius·s + 1.5 (`Math.hypot`), the push direction is the offset's
+  own (else away from the camera, else +x) and the push distance is the largest √(π² + r² − D) − π
+  over every buffered blob sphere the push line meets; it is applied only if at least one sphere
+  contains the camera.
+- **Balloon.** Lathe(9-point profile, 14 sectors) → `toNonIndexed()` (the indexed lathe is
+  discarded) → no uv, smooth normals, colour per 6-vertex quad: red #d93f36 when (sector + row) is
+  even, else cream #fff4e4 (336 / 336). Basket 185 boxes, pilot group (−.12, −2.9, .13) scale
+  .64, 4 ropes, 4 sandbags (hanger, Ico(1, 1) bag, neck cylinder, tie); all LOCAL_GLOW
+  {position (0, −1.9, 0), radius 4.5, strength .65} and merged into balloon-local space into 9
+  batches (basketTrim, wood, wicker, jacket, jacketTrim, skin, hair, rope, bag); the passenger
+  group stays empty. Burner and flame sit outside the local glow and the merge.
+- **W stream closed.** Clouds are the last `world.rand` consumer: after a full build the next
+  draw is 0.23735972004942596 on both sides, so equal cloud layouts prove every earlier draw.
+- **Shadows and textures.** `world.noShadow` gains water, waterfall, the two flame cones and the
+  burner glow (111 entries); clouds, the balloon body and the burner cast shadows through the
+  custom depth pass. The water uploads `heightTex`, so `renderer.info.memory.textures` reaches
+  the original's 6. The burner glow joins the night-glow registry automatically.
+- **Allocation parity.** UUID draws per step: buildWater 24, buildClouds 2128, buildBalloon 2940
+  (cold npr cache), equal on both sides; temporary blob/accent meshes, one BoxGeometry per box and
+  the discarded indexed lathe are allocated exactly as the original does. Per-frame drift,
+  avoidance and flight allocate nothing and draw no random numbers.
+- **Build-step registry.** `WORLD_BUILD_STEPS` stays a frozen array, but its entries are now
+  writable and `runWorldBuildSteps` reads `step.run` at call time, so tests can wrap a step
+  (`tests/helpers/counted-full-world-builds.mjs`). `updateWorld` slot 11 needs `balloonFlame`, so
+  a partial world (stopped before `buildBalloon`) throws in `world.update`, as the original does.
+- **Quirks kept for parity:** scale-0 clouds whose centre is in the view or shadow frustum still
+  cost a draw call per pass; a wrap zeroes the avoidance offset (an invisible pop at the band
+  edge); the waterfall drops to y ≈ −18, far below the plinth base; the water shoreline has a
+  half-texel offset (≈ 0.31 u) and 8-bit height quantisation (≈ 0.047 u); the balloon yaws at
+  0.1 rad/s regardless of its heading; burner and flames sit outside the local glow; avoidance
+  assumes uniform scale and no rotation; the original's waterfall carries an unused headlight
+  uniform pair.
+
+### Parity tooling additions (modification-map entries)
+
+- `tools/parity/water-clouds-balloon-parity-shots.mjs` (new; the shot list is at 199 lines):
+  `waterCloudsBalloonShots(stage)` → `overview-zoomed-day-masked`, `overview-zoomed-night-masked`
+  (pose Z = `ZOOMED`), `overview-day-waterfall-roi` (region `waterfall`), `balloon-closeup-day|night`
+  (pose B), `water-closeup-day|night` (pose W), `waterfall-closeup-day|night` (pose F, `clouds`
+  hidden too), `clouds-debug-hidden` (`debugLayerOff: 'Clouds'`); all 600 frames, hide
+  `cloneMissing` + `transient`, stage `residents-and-forest`. `parity-shot-list.mjs` preset
+  `cloneMissing` drops water, clouds and balloon (now birds and station figures only); the village
+  shots name their regions (`village`, `windmill`) explicitly.
+- `tools/parity/shot-region-projection.mjs`: region `waterfall` (the DoubleSide shader mesh under
+  `world.group`).
+- `tools/parity/water-clouds-balloon-runtime-probe.mjs` (new) wired into `runtime-counts-probe.mjs`:
+  scenario field `waterCloudsBalloon` (see the parity testing guide).
+- `tests/helpers/clone-simulation-driver.mjs`: `stepCloneFrame` calls
+  `ctx.world.updateCloudCamera(ctx.camera.position, dt)` unguarded.

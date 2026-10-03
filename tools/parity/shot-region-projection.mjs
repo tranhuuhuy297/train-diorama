@@ -2,7 +2,7 @@
 // the shot camera to CSS pixels in the page, padded and clamped to the viewport. Compare crops both
 // PNGs to each region (scaled by devicePixelRatio) and judges the shot on those crops.
 
-export const REGION_NAMES = Object.freeze(['village', 'windmill']);
+export const REGION_NAMES = Object.freeze(['village', 'windmill', 'waterfall']);
 export const REGION_PADDING_PX = 12;
 
 // Runs in the page; parity-surface names only, so both sites resolve the same parts.
@@ -15,6 +15,8 @@ export function computeRegionsInPage({ names, padding }) {
     // Houses plus the shrub mesh added right after the last house.
     village: () => (houses.length > 0 ? [...houses, children[children.indexOf(houses.at(-1)) + 1]] : []),
     windmill: () => [world?.windmillBlades?.parent].filter(Boolean),
+    // The double-sided curtain: the only DoubleSide shader mesh directly under the world group.
+    waterfall: () => children.filter(child => child.isMesh && child.material?.uniforms && !child.material.uniforms.uColor && child.material.side === 2),
   };
   const camera = d.camera;
   camera.updateMatrixWorld();

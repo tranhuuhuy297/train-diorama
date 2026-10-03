@@ -14,6 +14,7 @@ import { treeCanopyHeightAt as queryTreeCanopyHeight } from './trees/tree-canopy
 import { updateWorld } from './world-per-frame-update.js';
 import { createSheepTransforms } from '../life/sheep/sheep-instance-pose-writer.js';
 import { sheepGroundAt } from '../life/sheep/sheep-pasture-ground-query.js';
+import { updateCloudCamera as updateCloudCameraAvoidance } from './sky/cloud-drift-fade-and-camera-avoidance.js';
 
 export { SIZE, HALF };
 
@@ -92,5 +93,10 @@ export class World {
   /** One simulation step of every animated world system; only valid on a fully built world. */
   update(elapsed, dt, trainPosition, trainMotion) {
     updateWorld(this, elapsed, dt, trainPosition, trainMotion);
+  }
+
+  /** Cloud glide-back and camera push on real (clamped) frame time; runs every frame, paused or not. */
+  updateCloudCamera(cameraPosition, dt) {
+    updateCloudCameraAvoidance(this.clouds, cameraPosition, dt);
   }
 }

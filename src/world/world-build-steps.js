@@ -16,6 +16,9 @@ import { buildTrees } from './trees/tree-instanced-layers.js';
 import { buildRiversideRocks } from './rocks/riverside-rock-scatter.js';
 import { VillageResidents } from '../life/village/village-residents.js';
 import { buildSheepFlock } from '../life/sheep/build-sheep-flock.js';
+import { buildWater } from './water/river-water-and-waterfall-builder.js';
+import { buildClouds } from './sky/cloud-field-spawner.js';
+import { buildBalloon } from './balloon/hot-air-balloon-burner-flame-and-flight.js';
 
 // Keep-out radius around each resident's yard, read by the tree and rock scatters.
 const YARD_CLEARANCE = 2.2;
@@ -51,9 +54,14 @@ export const WORLD_BUILD_STEPS = Object.freeze([
   { name: 'createVillageResidents', run: createVillageResidents },
   { name: 'buildTrees', run: buildTrees },
   { name: 'buildRocksAndSheep', run: buildRocksAndSheep },
-].map(step => Object.freeze(step)));
+  { name: 'buildWater', run: buildWater },
+  // The last draws from world.rand.
+  { name: 'buildClouds', run: buildClouds },
+  { name: 'buildBalloon', run: buildBalloon },
+]);
 
-/** Runs the steps in order; `skip` and `stopAfter` exist for partial builds in tests. */
+/** Runs the steps in order; `skip` and `stopAfter` exist for partial builds in tests. Entries stay
+ * writable and `run` is read per call, so tests can wrap a step (e.g. to count allocations). */
 export function runWorldBuildSteps(world, { stopAfter = null, skip = [] } = {}) {
   if (stopAfter !== null && !WORLD_BUILD_STEPS.some(step => step.name === stopAfter)) {
     throw new Error(`Unknown world build step: ${stopAfter}`);

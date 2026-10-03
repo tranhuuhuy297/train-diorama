@@ -130,7 +130,7 @@ Train suites:
   mean lifetime ÷ gap (3.0 s ÷ 4 frames = 45).
 - Node stepping order is written once, in `stepCloneFrame`: `world.nightAmount ← uNight` →
   `stepSimulation(ctx, dt·timeScale)` only when not paused and timeScale > 0 → `updateCameraRig`
-  (unscaled dt) → `world.updateCloudCamera?.(camera.position, dt)` → `scene.updateMatrixWorld()`,
+  (unscaled dt) → `world.updateCloudCamera(camera.position, dt)` (unguarded since P12) → `scene.updateMatrixWorld()`,
   mirroring `stepOriginalFrame` and the browser frame loop (the clone ctx has no time-of-day
   transition: for a night run call `applyPalette(LIGHTING_UNIFORMS, 'night')` beside the oracle's
   `setTimeOfDay('night', true)`). Later phases add work inside
@@ -233,10 +233,9 @@ nor skirt (`STRATA` define) nor one of the flat world-core signatures `uColor he
 `3f2a1f|0.1` plinth trim, `b8432f|0.12` red, `8a2f24|0.1` dark red, `b9ae98|0.35` stone; on the
 full original it keeps exactly the 53 core children). Presets: `skyOnly`, `transient`,
 `allFamilies` (every family above except `world`/`allButWorldCore`, plus the transients) and
-`cloneMissing` (`water`, `clouds`, `balloon`, `birds`, `stationFigures`: the systems later
-build steps add, hidden alike on both sites; on the clone it only touches World init's empty,
-unattached balloon group; `sheep` left the preset when the flock landed, so every masked shot now
-compares the sheep). The in-page
+`cloneMissing` (`birds`, `stationFigures`: the systems later build steps add, hidden alike on
+both sites; on the clone it hides nothing; `sheep` left the preset when the flock landed and
+`water`, `clouds`, `balloon` when P12 landed, so every masked shot now compares them). The in-page
 function lives in `page-hide-set-application.mjs`; restores run in reverse order so overlapping
 sets give back the original visibility.
 
@@ -280,8 +279,30 @@ differs from the pinned value, so re-measure and update the constant if train or
 `cloneMissing` + `train` + `transient`; references 07 and 17) moved here from the shell stage and
 are strict now that the trees stand on the clone.
 
-By day `uTime` moves only the tree sway on the clone (local-glow flicker is × uNight = 0; water and
-waterfall are masked or absent), so t1 vs t0 isolates the sway.
+By day `uTime` moves the tree sway and the water/waterfall patterns on both sites (local-glow
+flicker is × uNight = 0), so t1 vs t0 shows the sway plus the water; the hold relation still proves
+the paused clock.
+
+Water, cloud and balloon shots (`water-clouds-balloon-parity-shots.mjs`; same stage, 600 frames
+stepped so sim time is 10.05 s, hide `cloneMissing` + `transient`, deterministic thresholds; the
+settled S1/S7 views are `overview-day-settled-masked` / `overview-night-masked` and the evening
+bridge is `bridge-camera-evening`):
+
+| Shot | Time of day | Pose / extra | Reference |
+|---|---|---|---|
+| `overview-zoomed-day-masked` (S5) | day | Z = `ZOOMED` (home dollied by 0.95^14.4 toward (0, 4, 0)) | 12-overview-zoomed-in |
+| `overview-zoomed-night-masked` (S4) | night | Z | 17-night-overview-zoomed |
+| `overview-day-waterfall-roi` (S2) | day | overview home, region `waterfall` (judged on the crop) | 11b-hud-hidden-no-toast |
+| `balloon-closeup-day` (S6) | day | B: (26.92, 26.36, 10.96) → (31.92, 25.06, 4.96) | 12-overview-zoomed-in |
+| `balloon-closeup-night` (S6n) | night | B | 17-night-overview-zoomed |
+| `water-closeup-day` (W1) | day | W: (−4, 24, 18) → (−2, 0, 2) | 12-overview-zoomed-in |
+| `water-closeup-night` (W2) | night | W | 17-night-overview-zoomed |
+| `waterfall-closeup-day` (W3) | day | F: (0.3, −4, 96) → (0.3, −9, 64), `clouds` hidden | 11b-hud-hidden-no-toast |
+| `waterfall-closeup-night` (W4) | night | F, `clouds` hidden | 17-night-overview-zoomed |
+| `clouds-debug-hidden` | day | overview home, `debugLayerOff: 'Clouds'` | 14-overview-day-settled |
+
+Water and waterfall GLSL is never compared as text: the shaders are written independently, and
+these renders (plus S1/S7) are the proof of output parity.
 
 Village and windmill shots (stage `village-and-windmill`; 3 s stepped, hide `unbuiltAfterWindmill`
 + `transient`, house smoke visible, regions `village` + `windmill`, deterministic thresholds per
@@ -407,6 +428,18 @@ from the first step after the preamble; Ki is the first frame route i enters `es
 episode whose startle (or same-step startle + jump) began after frame 60. Printed as `PASS|FAIL
 sheep probe: hop frames [K1,K2,K3]`; every field must be equal, all three hops found, and K2 must
 equal `SHEEP_HOP_K2`.
+
+`waterCloudsBalloon` (`water-clouds-balloon-runtime-probe.mjs`; in every scenario, null without a
+balloon flame; full float precision): `time`, `cloudCount`, per cloud `position` (drift position
+without the avoidance offset), `speed`, `travelWidth`, `instanceCount` (the single InstancedMesh
+child), `instanceTotal`, `windmillRoofHeight`, `balloon` (position), `water` {`heightTexBound`,
+`size`, `inNoShadow`} (first `world.group` mesh with a `uHeight` uniform) and `waterfall` {`side`,
+`vertices`, `indices`, `inNoShadow`} (the child right after the water). Printed as `PASS|FAIL
+water/clouds/balloon <scenario>`: each site must have 33 clouds with Σ 464 instances, roof height
+22.266444503377606, a balloon within 1e-6 of the closed-form flight at its `time`, the water bound
+to its own `heightTex` with size 124, a DoubleSide 225-vertex / 1152-index waterfall, both in
+`noShadow`, and every value equal across sites. Clouds are the last world.rand consumer, so this
+also proves the whole placement stream in the browser.
 
 Post synthetic-input probe: a 64×64 colour ramp and a two-level float depth texture go through
 each site's post material for 18 combinations of outline × (night, saturation) × (pixel,
@@ -682,3 +715,30 @@ open, `body.hud-hidden`) are identical on both sites.
   / 363 geometries / 5 textures / 20 programs (original 1373 / 1,762,696 / 419 / 6 / 25); sky-only
   equal, station probe equal on the first attempt, post synthetic probe max diff 0, every check
   passes on both sites.
+
+### Water, clouds and balloon (P12, 2026-10-03)
+
+- Node: `tests/parity/water-clouds-balloon-parity.test.mjs` builds the full original and the full
+  clone first in its own process (cold npr caches), counting `Math.random` draws inside
+  `buildWater` / `buildClouds` / `buildBalloon` (prototype methods on the original, wrapped
+  registry `step.run` on the clone; `tests/helpers/counted-full-world-builds.mjs`): 24 / 2128 /
+  2940 on both sides. The next `world.rand()` is 0.23735972004942596 on both; all 33 clouds
+  (instance matrices, colliders, radius, position, speed, band fields, age, scale, bounding
+  spheres) are bitwise equal with Σ 464 instances; water, waterfall, balloon and the last five
+  `noShadow` entries match by signature; the whole `world.group` (111 children) matches with only
+  the original's station figures excluded; water/waterfall side, transparency, depth flags and the
+  water uniform key sequence match. Then 18 000 frames (300 sim-seconds, a 300-frame pause, clouds
+  3–8 debug-hidden for 600 frames, a camera that sweeps through each layer and then sits in cloud
+  centres) compare every cloud's drift position, offset, group position, scale and age plus the
+  balloon pose every 60 frames: identical (about 3 s). `residents-trees-rocks-parity` (C) now
+  compares full builds on both sides, since a world stopped at the rock step no longer matches the
+  full clone.
+- Browser: `overview-day-settled-masked`, `overview-night-masked`, `bridge-camera-evening` and the
+  ten new water/cloud/balloon shots are pixel-identical (mean 0.000, max channel diff ≤ 1; the
+  `waterfall` crop of S2 max 0).
+- Probe: `PASS water/clouds/balloon` in both scenarios; textures 6 on both sites. The default
+  scenario still differs only by P13 content (birds, station figures, perches): clone 1087 calls /
+  1,745,012 triangles / 380 geometries / 6 textures / 24 programs (original 1373 / 1,762,696 / 419 /
+  6 / 25). With `cloneMissing` hidden, `--shot overview-day-settled-masked --fields
+  calls,triangles,textures` gives 1092 / 1,749,544 / 6 on both sites, `--shot balloon-closeup-night`
+  535 / 1,671,594 / 6 on both. Debug-menu checks (Clouds toggle logs and visibility) pass on both.

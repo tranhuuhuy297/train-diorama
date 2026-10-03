@@ -27,6 +27,8 @@ export function createFrameLoop(d) {
     d.world.nightAmount = d.lightingUniforms.uNight.value;
     if (!d.paused && d.timeScale > 0) stepSimulation(d, dt * d.timeScale);
     d.updateCamera(dt);
+    // Real clamped dt, outside the sim gate: clouds still part around the camera while paused.
+    d.world.updateCloudCamera(d.camera.position, dt);
     d.render();
 
     const stats = d.performanceStats;

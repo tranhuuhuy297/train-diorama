@@ -13,9 +13,9 @@ reference. The logo and favicon in `assets/` are this repository's own original 
 |---|---|---|
 | ![Evening](docs/images/overview-evening.jpg) | ![Night](docs/images/overview-night.jpg) | ![Pixel art](docs/images/overview-pixel-art.jpg) |
 
-**Status:** terrain, track, bridge, station, village, windmill, steam train, time of day, ink lines and
-pixel art are done. Forest, water and waterfall, clouds, balloon, sheep, birds, station travelers and
-the Free / Train / Bridge cameras are in progress.
+**Status:** terrain, track, bridge, station, village, windmill, steam train, time of day, ink lines,
+pixel art, village residents, forest, rocks, the Free / Train / Bridge cameras, sheep, water and
+waterfall, clouds and the hot-air balloon are done. Birds and station travelers are in progress.
 
 ## References
 

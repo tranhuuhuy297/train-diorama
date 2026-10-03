@@ -68,7 +68,7 @@ export function stepCloneFrame(ctx, dt) {
   ctx.world.nightAmount = ctx.lightingUniforms.uNight.value;
   if (!ctx.paused && ctx.timeScale > 0) stepSimulation(ctx, dt * ctx.timeScale);
   updateCameraRig(ctx, dt);
-  ctx.world.updateCloudCamera?.(ctx.camera.position, dt);
+  ctx.world.updateCloudCamera(ctx.camera.position, dt);
   ctx.scene.updateMatrixWorld();
 }
 

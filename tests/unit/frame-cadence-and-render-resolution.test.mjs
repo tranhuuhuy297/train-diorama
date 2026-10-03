@@ -27,7 +27,9 @@ function fakeDiorama() {
     camera: { position: new THREE.Vector3() },
     // Each nightAmount write records the calls before it and the sim time (unchanged until the sim step).
     world: {
-      nightWrites: [], update() {}, updateCloudCamera() {},
+      nightWrites: [], cloudCameraCalls: [], update() {},
+      // Records the calls before it, its dt and whether it got the live camera position.
+      updateCloudCamera(position, dt) { this.cloudCameraCalls.push([calls.map(c => c[0]).join(), dt, position === d.camera.position]); },
       get nightAmount() { return this.nightWrites.at(-1)?.value ?? 0; },
       set nightAmount(value) { this.nightWrites.push({ value, after: calls.map(c => c[0]).join(), simTime: d.time }); },
     },
@@ -73,6 +75,7 @@ test('loop dispatch order and dt clamping; paused and timeScale gating', () => {
   loop(200);
   assert.deepEqual(d.calls, [['tod', 0.2], ['cam', 0.05], ['render']]);
   assert.deepEqual(d.world.nightWrites, [{ value: 0.7, after: 'tod', simTime: 0 }], 'uNight copied after time of day, before the sim step');
+  assert.deepEqual(d.world.cloudCameraCalls, [['tod,cam', 0.05, true]], 'cloud camera after the camera, before render, clamped real dt');
   assert.equal(d.time, 0.05);
   assert.equal(G.uTime.value, 0.05);
   assert.equal(d.nextFrameAt, 208.33333333333334);
@@ -90,11 +93,13 @@ test('loop dispatch order and dt clamping; paused and timeScale gating', () => {
   assert.equal(paused.time, 0, 'sim frozen while paused');
   assert.equal(paused.world.nightAmount, 0.7, 'nightAmount still follows uNight while paused');
   assert.deepEqual(paused.calls.map(c => c[0]), ['tod', 'cam', 'render'], 'camera/render still run');
+  assert.deepEqual(paused.world.cloudCameraCalls, [['tod,cam', 0.05, true]], 'clouds still part around the camera while paused');
 
   const zeroScale = fakeDiorama();
   zeroScale.timeScale = 0;
   createFrameLoop(zeroScale)(200);
   assert.equal(zeroScale.time, 0, 'timeScale 0 behaves like paused for the sim');
+  assert.equal(zeroScale.world.cloudCameraCalls.length, 1);
 
   const doubleScale = fakeDiorama();
   doubleScale.timeScale = 2;
