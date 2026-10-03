@@ -43,7 +43,7 @@ compare report writes `referencePath: null`.
 | `original-world-stepper.mjs` | `ORIGINAL_BUILD_STEPS` (14), `CLONE_TO_ORIGINAL_STEP`, `INLINE_ORIGINAL_STEPS`, `toOriginalStep`, `buildOriginalWorld({stopAfter, skip})` → `{world, stoppedAfter, milliseconds}` |
 | `original-simulation-oracle.mjs` | `createOriginalSimulation({world})`, `stepOriginalFrame(ctx, dt)`, `setOriginalMode`, `snapshotSimulation`, `runWithSeededMathRandom(seedOrGenerator, fn)` (a seed restarts mulberry32 per call; a generator function keeps one stream running across calls), `withCapturedConsole(fn)`, `ORACLE_MATH_RANDOM_SEED` |
 | `oracle-camera-controls-stub.mjs` | `cameraRig()` → `{camera, controls, firstPersonControls}` stubs (home pose, reset semantics only), shared by the oracle and the clone driver |
-| `clone-simulation-driver.mjs` | `createCloneSimulation({world})` (ctx with the oracle's shape: sim fields, `cameraRig()` stubs, `puffTimer` accessor onto the pool; `world` defaults to a clone World), `stepCloneFrame(ctx, dt)`, `snapshotTrainState(ctx)` |
+| `clone-simulation-driver.mjs` | `createCloneSimulation({world})` (ctx with the oracle's shape: sim fields, `cameraRig()` stubs, `puffTimer` accessor onto the pool; without `world` the runtime `composeDioramaScene` builds a clone World and the scene), `stepCloneFrame(ctx, dt)`, `snapshotTrainState(ctx)` |
 | `sheep-flock-parity-lockstep.mjs` | `firstSheepFlockMismatch(original, clone)` → null or `{sheepIndex, field, original, clone}` (in place, `Object.is`: count, state fields, orientation, route fields, the three raw instance arrays); `runSheepLockstep({frames, stepOriginal, stepClone, beforeFrame, compare})` → `{mismatch: {frame, …} \| null, logs: {original, clone}}` (per-side `mulberry32(20260930)` Math.random and `[SHEEP]` log buffers, restored in `finally`) |
 | `smoke-puff-behaviour-checks.mjs` | `trackPuffs(ctx, dt)` → log with `record(frame)` (call after each step: spawns with the interval the pool saw, live counts, emission gate, speed); `assertPuffBehaviour(log, {expectedDwellGaps})` |
 | `fresh-process-train-material-ids.mjs` | `freshProcessTrainMaterialRows('clone' \| 'original')` → per mesh `[material id − smallest, type, name]` from a `new Train()` built in a child node process (cold npr caches); `buildTrainMaterialRows(side)` is what the child runs |
@@ -793,3 +793,193 @@ open, `body.hud-hidden`) are identical on both sites.
   programs on both sites (and 2 / 962 sky-only); 0 differing fields; `PASS travelers/birds` in both
   scenarios.
 
+## 10. Release sign-off (1.0.0)
+
+### Commands
+
+```bash
+npm run parity:fetch                       # .parity-cache/original (18 files, sha-checked)
+npm test && npm run test:parity            # node: unit + oracle suites, incl. full-scene-signature-parity
+npm run check:lines
+npm run dev &                              # clone on :4317 (the tools also start it on demand)
+npm run parity:signoff                     # capture --shots signoff → compare --shots signoff → probe --states signoff
+npm run parity:capture -- --shots ov-day-t0,dom-hud-day --target both --repeat   # noise floor
+npm run parity:compare -- --shots ov-day-t0,dom-hud-day --a .parity-output/shots/clone --b .parity-output/shots/clone-repeat
+npm run parity:perf -- --runs 10           # BUILD / CPU-submit medians, heap (--skip-heap to omit)
+npm run parity:research                    # research recapture on the clone + contact sheet
+npm run parity:smoke -- --url http://localhost:4317/
+```
+
+Env: `CLONE_URL` (default `http://localhost:4317/`), `TARGET_URL` (default the reference site; a
+pinned fallback is `node tools/static-dev-server.mjs --root "$PARITY_RESEARCH_DIR/source" --port 4318`
+with `TARGET_URL=http://localhost:4318/`), `PARITY_RESEARCH_DIR` (default
+`../plans/260930-train-diorama-clone/research`, read only), `CHROMIUM_PATH`,
+`VERCEL_AUTOMATION_BYPASS_SECRET` (optional).
+
+Sign-off recipe (in addition to section 4): one browser context per shot; the station-sign font
+readiness is taken from the hook's `fredokaReadyAtBuild` (same task as the build; the loader-label mark
+is recorded too but reads false on both sites because the faces are still loading then), and the
+station-sign canvas hash is held to the run's reference (the first font-ready load, the original's when
+both sites run); either one failing reloads the page in a fresh context, up to 2 reloads (a hash still
+different after that is kept and reported by compare/probe; fonts still not ready fail the shot); `Math.random` is reseeded right before the K steps; a pose override sets camera, `lookAt`
+and `controls.target`, then runs the real cloud updater 180 times at 1/60 s; transients (puffs,
+sparks) are hidden unless the shot says visible; 3D shots are full-page (HUD included) after 2 rAF
+and `waitForToastSettled`; DOM shots freeze rendering, hide `#scene canvas`, run the prelude and
+screenshot with animations disabled and the masks painted `#ff00ff` on both sites. The masked
+elements' rects (CSS px, relative to the screenshot) go into the meta as `maskRects`; compare
+excludes the union of both sites' rects from the metrics (numerator and denominator), and a masked
+shot whose metas lack them fails ("recapture"). Tagged console lines
+(`[GAMEPLAY|CAMERA|BIRDS|SHEEP|STATION|VILLAGE|HUD|PAUSE|DEBUG|SETTINGS]`) are stored per shot and
+must be equal (a sign-off shot with a missing `.console.json` fails); the clone must log no page
+error and no `console.error`. Timeouts: 180 s for the loader, 120 s for every other in-page step
+(the error names the site, shot and step).
+
+Thresholds (0..255, unchanged): deterministic ≤ 1.0 mean / ≤ 0.5 % of pixels with a channel diff
+> 16; transients visible ≤ 3.0 / ≤ 3 %; DOM ≤ 0.5 / ≤ 0.2 %; dom-loading boxes (`.load-card`,
+`.load-logo`) within 0.5 px with the logo masked. Probe states compare exactly.
+
+### Independence audit
+
+```bash
+R="$PARITY_RESEARCH_DIR"
+python3 "$R/verbatim-overlap-check.py" "$R/.." $(git ls-files src styles tools tests index.html assets)
+python3 "$R/structural-similarity-check.py" "$R/.." .
+grep -rnE "([A-Z][A-Za-z_]*\.(js|css|svg)|index\.html):[0-9]+" src tools tests styles index.html   # empty
+sha256sum assets/*.svg "$R"/source/*.svg                                                       # no shared hash
+git ls-files .parity-cache .parity-output                                                      # empty
+```
+
+Allowed overlap hits (anything else is rewritten in its owning module):
+
+| allowance | example |
+|---|---|
+| standard three.js API idiom | `new THREE.ShaderMaterial(`, the full-screen-quad `gl_Position` line, `three/addons` imports |
+| Vercel's official Web Analytics snippet | the `window.vaq` queue stub in `index.html` |
+| DOM ids, Tailwind class names, §6 state names and selectors | `#hud-controls`, `body[data-time-of-day="night"] …`, `is-gone` |
+| short UI strings and §7 console strings | help-list labels, toasts, loader labels and hints, `[CAMERA] …` logs |
+| contract API names, parity-surface fields, state keys | `update(elapsed, dt, trainPosition, trainMotion)`, `this.flyAlongAnchor`, `state.lastPixelResolution` |
+| numeric values, option tables, colours | npr call-site options (`stipple: 0.55, stippleScale: 2.4`), CSS values, FOV table |
+| import map / CDN / font links | the unpkg URLs and Google Fonts preconnects |
+| standard public algorithm | smoothstep clamp, bilinear value-noise blend |
+
+### Sign-off results (2026-10-03)
+
+- **Target:** live reference site, unchanged since the research snapshot: all 18 fetched files
+  (14 JS, index.html, Styles.css, 2 SVGs) equal `research/source` by sha256; manifest aggregate
+  `f5e225f57bba0d2d…` (`.parity-output/original-manifest.json`). Profile `angle` (SwiftShader via
+  ANGLE), Chromium build 1243.
+- **Node:** `npm test` 295 pass / 0 fail / 0 skipped; `npm run test:parity` all pass, including
+  `full-scene-signature-parity.test.mjs`: construction signature equal (1201 entries), the first frame
+  logs exactly the two `[BIRDS] Take off` lines on both sides, 435 geometries / 128 materials /
+  2 textures reachable on both, R9 lists equal (`ctxGlowsMatch` true on both), world summary equal
+  (stationFrameIndex 1008, clouds 33, bridge [30, 178]) with equal next `world.rand()`, and
+  10 800 lockstep frames (overview with the dolly-in intro played to completion, side entered while
+  a second intro is armed, bridge, orbit, night overview, speedMul 2.5) with every scalar
+  `Object.is`-equal, 18 signature checkpoints equal and 189 identical log lines (`[BIRDS]`,
+  `[VILLAGE]`, `[STATION]`, `[SHEEP]` and the two in-sim `[CAMERA]` lines: `Overview intro completed`
+  from `updateCamera`, `Overview intro interrupted by mode selection` from `setMode`). The clone side
+  is composed by the runtime `composeDioramaScene`. `check:lines` OK (max 199). Hygiene greps empty.
+- **Noise floor:** ov-day-t0 and dom-hud-day captured twice per site: mean 0, 0 % over, max 0 on
+  both sites (0 % of every limit).
+- **Browser shots (28/28 pass):** every shot has meanAbsDiff ≤ 2e-6, 0 % of pixels over 16 and a
+  maximum channel difference of 0 (19 shots) or 1 (9 shots); every tagged console sequence is equal;
+  the clone logged no errors (the original logs one `console.error` per page for the aborted
+  analytics request, which the harness blocks). dom-loading boxes are identical on both sites:
+  `.load-card` (530, 261.078, 540 × 377.844), `.load-logo` (585, 261.078, 430 × 186.844).
+  Full table: `.parity-output/compare/summary.md`.
+
+  | shot | class | meanAbsDiff | > 16 | max | log sequence | boxes | verdict |
+  |---|---|---|---|---|---|---|---|
+  | ov-day-t0 | deterministic | 0.000002 | 0.000 % | 1 | equal | n/a | PASS |
+  | ov-day-t30 | deterministic | 0.000001 | 0.000 % | 1 | equal | n/a | PASS |
+  | ov-day-t30-fx | transient | 0.000001 | 0.000 % | 1 | equal | n/a | PASS |
+  | ov-evening-t0 | deterministic | 0.000002 | 0.000 % | 1 | equal | n/a | PASS |
+  | ov-evening-t30 | deterministic | 0.000002 | 0.000 % | 1 | equal | n/a | PASS |
+  | ov-night-t0 | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | ov-night-t30 | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | ov-zoom-day | deterministic | 0.000000 | 0.000 % | 1 | equal | n/a | PASS |
+  | ov-zoom-night | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | pixel-360 | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | pixel-720 | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | ink-off | deterministic | 0.000002 | 0.000 % | 1 | equal | n/a | PASS |
+  | train-day | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | train-day-fx | transient | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | train-night | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | bridge-day | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | bridge-evening | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | bridge-evening-fx | transient | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | free-day | deterministic | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | hud-hidden | deterministic | 0.000002 | 0.000 % | 1 | equal | n/a | PASS |
+  | mobile-ov-day | deterministic | 0.000001 | 0.000 % | 1 | equal | n/a | PASS |
+  | dom-hud-day | dom | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | dom-hud-night | dom | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | dom-help | dom | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | dom-toast-bridge | dom | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | dom-debug | dom | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+  | dom-loading | dom | 0.000000 | 0.000 % | 0 | equal | equal | PASS |
+  | dom-mobile-hud | dom | 0.000000 | 0.000 % | 0 | equal | n/a | PASS |
+- **Probe (8/8 states exactly equal):** renderer counts, world summary, ordered lists (17 derived
+  glows, 192 shadow-hidden objects), 45 instanced meshes and the sign-canvas hash `8df1cf62` match.
+  ov-day-t0 reads 1371 / 1,759,388 / 419 / 6 next to the research's live readout
+  1411 / 1,773,736 / 419 / 6 (puffs visible there); textures = 6.
+
+  | state | calls | triangles | points | lines | geometries | textures | programs | s mod L | vs original |
+  |---|---|---|---|---|---|---|---|---|---|
+  | ov-day-t0 | 1371 | 1,759,388 | 0 | 0 | 419 | 6 | 25 | 237.567 | equal |
+  | ov-night-t0 | 1391 | 1,762,908 | 0 | 0 | 436 | 6 | 27 | 237.567 | equal |
+  | ov-day-t30 | 1372 | 1,760,268 | 0 | 0 | 419 | 6 | 25 | 180.682 | equal |
+  | train-day | 1323 | 1,737,724 | 0 | 0 | 419 | 6 | 25 | 37.057 | equal |
+  | bridge-evening | 1170 | 1,734,040 | 0 | 0 | 419 | 6 | 25 | 37.057 | equal |
+  | free-day | 867 | 1,704,230 | 0 | 0 | 419 | 6 | 25 | 237.567 | equal |
+  | pixel-360 | 1371 | 1,759,388 | 0 | 0 | 419 | 6 | 25 | 237.567 | equal |
+  | mobile-ov-day | 1010 | 1,704,838 | 0 | 0 | 415 | 5 | 22 | 237.567 | equal |
+- **Performance (`parity:perf -- --runs 10`, alternating cold loads, `.parity-output/perf/perf.json`):**
+
+  | metric (median of 10) | original | clone | ratio | budget |
+  |---|---|---|---|---|
+  | BUILD ms (BUILDING → PREPARING labels) | 892.95 (CV 11.2 %) | 916.45 (CV 9.1 %) | 1.026 | ≤ 1.10 pass |
+  | CPU submit, frozen (inverted EMA) ms | 4.48 | 4.40 | 0.983 | ≤ 1.10 pass |
+  | CPU submit, running ms | 4.88 | 4.87 | 1.000 | ≤ 1.10 pass |
+  | LOAD ENGINE ms (informational) | 1082.7 | 808.1 | 0.746 | – |
+  | navigation → loader hidden ms (informational) | 8525.6 | 7917.2 | 0.929 | – |
+
+  The first 5-run pass had CV above 5 % (clone BUILD 9.1 %), so the 10-run pass above is the
+  verdict; it also passed at 5 runs (BUILD 740.5 vs 797.1 ms). Loads ran under SwiftShader, so CVs of
+  8–14 % are the noise of this profile; alternation keeps both sites under the same load. The clone's
+  LOAD ENGINE is faster here because its modules come from localhost while the original's come from
+  its deployment.
+
+  Heap (one run per site, 1200 page-side steps + 60 natural frames, sampling every 1 KB including
+  objects collected by minor and major GC): retained growth clone 497,724 B vs original 472,088 B
+  (limit original + 64 KB: pass); allocation per step clone 73,825 B vs original 101,366 B total and
+  73,478 B vs 100,966 B app-attributed (≤ 1.10×: pass). Clone app sites ≥ 1 KB/step mirror original
+  allocations of the same work: `sheepGroundAt` 23.7 KB (original 24.6 KB), the exclusion test's
+  closure in `World#excluded` 14.8 KB (original 15.1 KB), the render pass (`renderDioramaFrame` +
+  shadow `render`, 9.7 KB vs the original's `render` 9.7 KB), train placement 3.5 KB, bird animation
+  and snapshots 5.1 KB (original bird update 6.7 KB), sheep flock 2.5 KB (original 12.5 KB), cloud
+  camera 1.9 KB (original 1.9 KB), `heightAt` 1.6 KB. No scratch-reuse change was needed.
+- **Research recapture (28/28 ≥ 7/10, no exceptions):** overlaps 8–10 (01-loading-screen 8, the
+  logo is the project's own artwork; 06b 8; 05-train-camera, 10, 16 at 9; all others 10); ΔmeanLuma
+  within ±2.8, bucket ratios 0.96–1.01 except the loader (0.54, simpler original logo artwork); no
+  clone page errors; `research/captures` untouched. Contact sheet:
+  `.parity-output/research-recapture/research-contact-sheet.html`.
+- **Independence audit:** 138 overlap hits over 248 tracked files, every one inside an allowance
+  (UI/console strings 34, three.js idioms 30, DOM ids/classes/selectors 28, numeric values and
+  option tables 24, contract names 14, import map/CDN 5, standard algorithms 2, analytics snippet 1;
+  per-hit list in `.parity-output/independence-audit.txt`); structural similarity ≤ 0.22 for every
+  JS/CSS file (index.html 0.53: DOM ids, classes and labels); no file:line citations; SVG hashes share
+  nothing with the original's; nothing under `.parity-cache/` or `.parity-output/` is tracked.
+  Logo/favicon review: the logo is the project's own Fredoka 700 "Train Diorama" wordmark with a
+  `#3f2a1f` outline/shadow, `#ca4e36` and `#fbf4e2` fills and a hand-built steam-locomotive motif; the
+  favicon is the project's own clock tile at 10:10. Neither reuses or traces the reference artwork.
+- **Smoke:** localhost and the GitHub Pages site pass every check (no errors, no failed or ≥ 400
+  requests, loader hidden, `[GAMEPLAY] Started`, `H · Hide HUD` toast, pagehide dispose, no analytics
+  request; on GitHub Pages the five development-only paths return 404). Vercel: not deployed (awaits
+  approval).
+- **Instance dispatch:** wrapping `render`, `updateTimeOfDay`, `updateCamera` and
+  `world.updateCloudCamera` on the live clone counted 2 calls each within 2 rAF.
+- **Style bible 1–15:** checked against the contact sheet and the sign-off shots — 1 framing, 2 cel
+  bands, 3 stipple, 4 ink lines, 5 post finish, 6 sky, 7 time of day, 8 palette, 9 geometry, 10 scene
+  inventory, 11 cameras, 12 pixel art, 13 HUD, 14 loader (own logo), 15 persistence: all ticked.
+- **Reviewer:** automated sign-off run by the implementation agent; the logo/favicon and style-bible
+  ticks above are its visual review and await the owner's confirmation.

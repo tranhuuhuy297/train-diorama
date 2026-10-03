@@ -13,8 +13,10 @@ import { Train } from '../../src/train/train.js';
 import { BrakeSparks } from '../../src/train/brake-sparks.js';
 import { LocomotiveSmokePuffPool } from '../../src/train/locomotive-smoke-puff-pool.js';
 import { initTrainMotion } from '../../src/train/train-station-motion-controller.js';
-import { createWorldBirdSystem } from '../../src/engine/diorama-scene-composition.js';
-import { updateTrainAndEffects } from '../../src/train/train-frame-update.js';
+import { composeDioramaScene, createWorldBirdSystem } from '../../src/engine/diorama-scene-composition.js';
+import { updateTrainAndEffects, writeHeadlightUniforms } from '../../src/train/train-frame-update.js';
+import { skyMaterial } from '../../src/materials/procedural-sky-dome-material.js';
+import { collectNightLightGlows, applyNightGlowVisibility } from '../../src/engine/night-light-glow-registry.js';
 
 installMinimalDomShim();
 
@@ -28,30 +30,41 @@ function cameraFields() {
   };
 }
 
-/** `world` defaults to a fresh clone World; pass an original World to isolate the train code. */
+// Injected-world path only: the same insertion order as composeDioramaScene, around a prebuilt World.
+function composeAroundWorld(ctx, world) {
+  ctx.world = world;
+  ctx.scene.add(world.group);
+  ctx.birds = createWorldBirdSystem(world);
+  ctx.scene.add(ctx.birds.group);
+  const freeStart = world.freeCameraStart;
+  ctx.freeCameraPose = { position: freeStart.position.clone(), target: freeStart.target.clone() };
+  ctx.train = new Train();
+  ctx.scene.add(ctx.train.group);
+  ctx.brakeSparks = new BrakeSparks(world.heightAt.bind(world));
+  ctx.scene.add(ctx.brakeSparks.mesh);
+  initTrainMotion(ctx, world.stationS);
+  ctx.sky = Object.assign(new THREE.Mesh(new THREE.SphereGeometry(700, 32, 16), skyMaterial()), { frustumCulled: false, renderOrder: -1 });
+  ctx.scene.add(ctx.sky);
+  ctx.puffPool = new LocomotiveSmokePuffPool(ctx.scene);
+  ctx.puffs = ctx.puffPool.puffs;
+  ctx.shadowHiddenObjects = [ctx.sky, ctx.brakeSparks.mesh, ...world.noShadow, ...ctx.train.noShadow, ...ctx.puffs.map(puff => puff.mesh)];
+  ctx.nightGlows = collectNightLightGlows(ctx.scene);
+}
+
+/** Without `world` the runtime composeDioramaScene builds a fresh clone World and the whole scene; pass an
+ * original World to isolate the train code (same insertion order, composed here around it). */
 export async function createCloneSimulation({ world = null } = {}) {
-  const builtWorld = world ?? (await import('./clone-world-factory.mjs')).createCloneWorld();
   const scene = new THREE.Scene();
   scene.matrixWorldAutoUpdate = false;
-  scene.add(builtWorld.group);
-  const birds = createWorldBirdSystem(builtWorld);
-  scene.add(birds.group);
   const ctx = {
-    scene, world: builtWorld, birds, lightingUniforms: LIGHTING_UNIFORMS,
+    scene, lightingUniforms: LIGHTING_UNIFORMS,
     time: 0, s: 0, speed: 0, stopTimer: 0, justLeft: false,
     speedMul: 1, timeScale: 1, paused: false, mode: 'overview',
     updateTrain(dt) { return updateTrainAndEffects(this, dt); },
     ...cameraFields(),
   };
-  const freeStart = builtWorld.freeCameraStart;
-  ctx.freeCameraPose = { position: freeStart.position.clone(), target: freeStart.target.clone() };
-  ctx.train = new Train();
-  scene.add(ctx.train.group);
-  ctx.brakeSparks = new BrakeSparks(builtWorld.heightAt.bind(builtWorld));
-  scene.add(ctx.brakeSparks.mesh);
-  initTrainMotion(ctx, builtWorld.stationS);
-  ctx.puffPool = new LocomotiveSmokePuffPool(scene);
-  ctx.puffs = ctx.puffPool.puffs;
+  if (world) composeAroundWorld(ctx, world);
+  else composeDioramaScene(ctx);
   Object.defineProperty(ctx, 'puffTimer', {
     enumerable: true,
     get() { return this.puffPool.timer; },
@@ -67,12 +80,16 @@ export function setCloneMode(ctx, mode) {
   setCameraMode(ctx, mode);
 }
 
-/** Oracle and frame-loop order: night amount, gated sim at dt·timeScale, camera rig, cloud camera, matrices. */
+/** Oracle and frame-loop order: night amount, gated sim at dt·timeScale, camera rig, cloud camera, then the
+ * render's non-GPU side effects (glow visibility, headlight uniforms, sky follow, matrices). */
 export function stepCloneFrame(ctx, dt) {
   ctx.world.nightAmount = ctx.lightingUniforms.uNight.value;
   if (!ctx.paused && ctx.timeScale > 0) stepSimulation(ctx, dt * ctx.timeScale);
   updateCameraRig(ctx, dt);
   ctx.world.updateCloudCamera(ctx.camera.position, dt);
+  applyNightGlowVisibility(ctx.nightGlows, ctx.lightingUniforms.uNight.value);
+  writeHeadlightUniforms(ctx.train, ctx.lightingUniforms);
+  ctx.sky.position.copy(ctx.camera.position);
   ctx.scene.updateMatrixWorld();
 }
 

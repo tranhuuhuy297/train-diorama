@@ -10,11 +10,21 @@ import { sheepFlockShots } from './sheep-flock-parity-shots.mjs';
 import { waterCloudsBalloonShots } from './water-clouds-balloon-parity-shots.mjs';
 import { stationTravelersAndBirdsShots } from './station-travelers-and-birds-parity-shots.mjs';
 import { resolveResearchDir, researchCapturePath } from './research-capture-paths.mjs';
+import { SIGNOFF_SHOTS } from './signoff-parity-shots.mjs';
 
 export { resolveResearchDir, researchCapturePath, researchSkipReason } from './research-capture-paths.mjs';
 export {
   PARITY_STAGES, ACTIVE_PARITY_STAGE, CHANNEL_DIFF_THRESHOLD, THRESHOLDS, HIDE_SETS, HIDE_PRESETS, expandHideSets,
 } from './parity-shot-stages-and-hide-sets.mjs';
+
+export {
+  SIGNOFF_SHOTS, SIGNOFF_IDS, SIGNOFF_PROBE_STATES, RESEARCH_EQUIVALENTS, ON_BRIDGE_STATES,
+} from './signoff-parity-shots.mjs';
+
+/** Stage shot or sign-off shot by id (ids never collide); undefined when unknown. */
+export function findShot(id) {
+  return PARITY_SHOTS.find(candidate => candidate.id === id) ?? SIGNOFF_SHOTS.find(candidate => candidate.id === id);
+}
 
 export function findMissingReferences(shots = PARITY_SHOTS, researchDir = resolveResearchDir()) {
   return shots

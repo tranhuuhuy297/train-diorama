@@ -1,5 +1,65 @@
 # Project changelog
 
+## [1.0.0] - 2026-10-03 — parity sign-off
+
+chore(release): full-scene parity sign-off, performance budget, final docs and deployment prep.
+
+### Added
+- `tests/parity/full-scene-signature-parity.test.mjs`: the whole scene against the original oracle —
+  construction signature (1201 entries) and its two `[BIRDS] Take off` lines, the ordered lists
+  (scene children, glow registry, shadow-hidden list), the world summary and the next `world.rand()`,
+  then 6 × 1800 lockstep frames (overview with the intro, train, bridge, free, night, 2.5× train) with
+  bitwise-equal scalars, signature checkpoints and identical log lines, `[CAMERA]` included.
+- `tests/helpers/world-summary-digest.mjs`: self-contained world summary, ordered lists, instanced
+  counts and sign-canvas hash, shared by node tests and page probes.
+- Browser sign-off: 21 full-page 3D + 7 DOM shots (`--shots signoff`), per-shot tagged console
+  sequences and error capture, dom-loading boxes, `--a/--b` noise-floor compares, `summary.md`,
+  and `parity:probe --states signoff` (8 frozen states compared exactly).
+- `parity:perf` (BUILD and CPU-submit medians from loader marks and the inverted EMA, CDP heap
+  sampling with app-frame attribution), `parity:research` (staged research recapture, palette overlap,
+  contact sheet) and `parity:smoke` (local and deployed smoke checks, analytics and excluded paths).
+- `tools/parity/parity-metrics-math.mjs` with its unit test; `tests/unit/hud-right-click-reset-to-defaults.test.mjs`
+  (covering test for the right-click resets); `docs/deployment-guide.md`.
+- `tools/static-dev-server.mjs`: `--root` and `--port` options (pinned-original fallback serve).
+
+### Changed
+- `tests/helpers/clone-simulation-driver.mjs` composes its scene with the runtime `composeDioramaScene`
+  (an injected World keeps the same order, composed around it) and applies the render's GPU-free side
+  effects each step, matching the oracle's full scene.
+- The full-scene lockstep plays the overview intro to completion and interrupts a second one with the
+  side switch on both sides, so the in-sim `[CAMERA]` lines are compared too.
+- Sign-off capture and probe reload (≤ 2) when the station-sign canvas hash differs from the run's
+  reference, not only when the sign fonts were not ready at build.
+- `compare --shots signoff` also writes `compare/signoff-report.json`; research-recapture exceptions
+  read only that report and only when it covers every sign-off shot from one capture run.
+- `research-recapture` finds the research script's `createRequire('<path>')` call by pattern instead of
+  a hard-coded local path.
+- `.vercelignore` also drops `.github/`, `.gitignore` and `README.md`; the smoke check asserts 404 for
+  the Pages workflow and `README.md`.
+- `compare-parity-shots.mjs` moved its PNG diff code to `png-diff-in-page.mjs`; sign-off helpers live
+  in `signoff-*.mjs` modules so every tool stays under 200 lines.
+- Docs finalised: architecture (consolidated contracts mirror, hook, dependency graph, data flow),
+  codebase summary (module index, files outside the unified tree, 147-row traceability), parity guide
+  (sign-off results), roadmap (post-parity backlog), PDR, design guidelines, code standards, README.
+- Sign-off compares exclude masked pixels (the union of both sites' `maskRects`, measured at capture)
+  from both the numerator and the denominator; a masked shot without rects fails. A sign-off shot with
+  a missing `.console.json` fails its log-sequence check. Every in-page capture step is bounded at
+  120 s (the loader wait at 180 s). `parity:research --pass main|extras` scores, retries and counts
+  only that pass's shots (22 or 6). The unused `reseedMathRandom` helper is gone (`stepFrames` reseeds).
+- Version 1.0.0.
+
+### Results
+- 28/28 sign-off shots within thresholds (max channel difference ≤ 1), equal log sequences, identical
+  loader boxes, zero clone errors; 8/8 probe states exactly equal (ov-day-t0: 1371 calls,
+  1,759,388 triangles, 419 geometries, 6 textures, 25 programs); noise floor 0.
+- Performance within budget (10 alternating cold loads): BUILD 1.026×, CPU submit 0.983× frozen and
+  1.000× running; heap growth +25.6 KB vs the original; allocation per step 0.73× the original.
+- Research recapture 28/28 at palette overlap ≥ 8/10; independence audit clean (all overlap hits
+  inside the allowances, no citations, own SVG artwork).
+
+### Fixed
+- No drift fixes were needed: every sign-off layer matched on the first run.
+
 ## [0.13.0] - 2026-10-03
 
 feat(life): station travelers (walking old man with cane, waiting grandmother) and bird flocks on perches.

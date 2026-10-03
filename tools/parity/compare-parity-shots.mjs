@@ -1,5 +1,7 @@
-// CLI: compares original vs clone captures (side-by-side + heatmap PNGs, metrics vs thresholds, meta warnings).
-// Usage: node tools/parity/compare-parity-shots.mjs [--shots a,b] [--in dir] [--region all|none|name,name]
+// CLI: compares original vs clone captures (side-by-side + heatmap PNGs, metrics vs thresholds, meta warnings,
+// sign-off log sequences and loader boxes, summary.md).
+// Usage: node tools/parity/compare-parity-shots.mjs [--shots a,b|signoff] [--in dir] [--region all|none|name,name]
+// [--a dir --b dir] (any two shot folders, e.g. a site and its repeat, for the noise floor)
 // Shots whose metas carry regions are judged on those crops; whole-frame metrics are then informational.
 import { parseArgs } from 'node:util';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
@@ -7,28 +9,14 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { launchParityBrowser } from './playwright-browser-launcher.mjs';
-import { CHANNEL_DIFF_THRESHOLD, THRESHOLDS, PARITY_SHOTS, researchSkipReason, researchCapturePath } from './parity-shot-list.mjs';
+import { CHANNEL_DIFF_THRESHOLD, THRESHOLDS, findShot, researchSkipReason, researchCapturePath } from './parity-shot-list.mjs';
+import { SIGNOFF_IDS, resolveSignoffIds } from './signoff-parity-shots.mjs';
 import { toDeviceRegion, selectRegions } from './shot-region-projection.mjs';
 import { runIntraSiteChecks } from './intra-site-shot-checks.mjs';
+import { computeDiffMetrics, diffInPage } from './png-diff-in-page.mjs';
+import { compareConsoleRecords, compareBoxes, noiseFloorShare, signoffSummaryMarkdown } from './signoff-shot-verdicts.mjs';
 
-// Self-contained on purpose: its source is injected into the page so node and page share one implementation.
-export function computeDiffMetrics(a, b, width, height, channelThreshold = 16) {
-  const pixelCount = width * height;
-  let sum = 0;
-  let over = 0;
-  let maxChannelDiff = 0;
-  for (let pixel = 0; pixel < pixelCount; pixel++) {
-    const offset = pixel * 4;
-    const red = Math.abs(a[offset] - b[offset]);
-    const green = Math.abs(a[offset + 1] - b[offset + 1]);
-    const blue = Math.abs(a[offset + 2] - b[offset + 2]);
-    sum += red + green + blue;
-    const largest = Math.max(red, green, blue);
-    if (largest > channelThreshold) over++;
-    if (largest > maxChannelDiff) maxChannelDiff = largest;
-  }
-  return { meanAbsDiff: sum / (pixelCount * 3), overThresholdFraction: over / pixelCount, maxChannelDiff };
-}
+export { computeDiffMetrics } from './png-diff-in-page.mjs';
 
 export function evaluateThresholds(metrics, thresholdClass) {
   const limits = THRESHOLDS[thresholdClass];
@@ -62,97 +50,81 @@ export function compareMetas(originalMeta, cloneMeta) {
   return warnings;
 }
 
-// Runs in the page: decode both PNGs, measure (whole frame and each region), compose original | clone | heat.
-async function diffInPage({ originalUrl, cloneUrl, threshold, regions, devicePixelRatio }) {
-  const decode = async url => {
-    const image = new Image();
-    image.src = url;
-    await image.decode();
-    const canvas = Object.assign(document.createElement('canvas'), { width: image.naturalWidth, height: image.naturalHeight });
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    context.drawImage(image, 0, 0);
-    return { image, context, width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data };
-  };
-  const [a, b] = await Promise.all([decode(originalUrl), decode(cloneUrl)]);
-  if (a.width !== b.width || a.height !== b.height) return { sizeMismatch: [a.width, a.height, b.width, b.height] };
-  const { width, height } = a;
-  const metrics = window.computeDiffMetrics(a.data, b.data, width, height, threshold);
-  const crops = regions.map(region => window.toDeviceRegion(region, devicePixelRatio, width, height)).filter(Boolean);
-  const regionMetrics = crops.map(crop => {
-    const [cropA, cropB] = [a, b].map(side => side.context.getImageData(crop.x, crop.y, crop.w, crop.h).data);
-    return { ...crop, metrics: window.computeDiffMetrics(cropA, cropB, crop.w, crop.h, threshold) };
-  });
-  const sheet = Object.assign(document.createElement('canvas'), { width: width * 3, height });
-  const context = sheet.getContext('2d');
-  context.drawImage(a.image, 0, 0);
-  context.drawImage(b.image, width, 0);
-  const heat = context.createImageData(width, height);
-  for (let offset = 0; offset < heat.data.length; offset += 4) {
-    const largest = Math.max(...[0, 1, 2].map(channel => Math.abs(a.data[offset + channel] - b.data[offset + channel])));
-    const grey = 0.35 * (0.2126 * a.data[offset] + 0.7152 * a.data[offset + 1] + 0.0722 * a.data[offset + 2]);
-    const blend = largest > threshold ? 1 : 0.6 * largest / threshold;
-    const tint = largest > threshold ? [255, 0, 0] : [255, 200, 0];
-    for (let channel = 0; channel < 3; channel++) heat.data[offset + channel] = grey + (tint[channel] - grey) * blend;
-    heat.data[offset + 3] = 255;
-  }
-  context.putImageData(heat, width * 2, 0);
-  context.strokeStyle = '#00e5ff';
-  for (const crop of crops) context.strokeRect(width * 2 + crop.x + 0.5, crop.y + 0.5, crop.w - 1, crop.h - 1);
-  return { metrics, regionMetrics, heatmap: sheet.toDataURL('image/png') };
-}
-
 const describeMetrics = m => (m ? `mean=${m.meanAbsDiff.toFixed(3)} over=${(m.overThresholdFraction * 100).toFixed(3)}% max=${m.maxChannelDiff}` : '');
 const pngNames = async dir => (existsSync(dir) ? (await readdir(dir)).filter(name => name.endsWith('.png')).map(name => name.slice(0, -4)) : []);
 const dataUrl = bytes => `data:image/png;base64,${bytes.toString('base64')}`;
-const readMeta = async file => (existsSync(file) ? JSON.parse(await readFile(file, 'utf8')) : {});
+const readJson = async (file, fallback) => (existsSync(file) ? JSON.parse(await readFile(file, 'utf8')) : fallback);
+const readMeta = file => readJson(file, {});
+const sidecar = (dir, id, suffix) => readJson(path.join(dir, `${id}${suffix}`), null);
 
-async function compareOne(page, inDir, id, regionRequest = 'all') {
-  const shot = PARITY_SHOTS.find(candidate => candidate.id === id);
-  const thresholdClass = shot?.thresholdClass ?? null;
+// `dirs` = [original-like, clone-like] shot folders; heatmaps go to <outDir>/compare.
+async function compareOne(page, { dirs, outDir, floor = false }, id, regionRequest = 'all') {
+  const shot = findShot(id);
+  const thresholdClass = shot?.thresholdClass ?? shot?.thresholds ?? null;
   const reference = shot?.reference ?? null;
   const referencePath = reference && !researchSkipReason() ? researchCapturePath(reference) : null;
   const result = {
     pass: false, reportOnly: shot?.reportOnly ?? false, metrics: null, limits: thresholdClass ? THRESHOLDS[thresholdClass] : null,
     thresholdClass, reference, referencePath, warnings: [], reason: null,
   };
-  const files = ['original', 'clone'].map(target => path.join(inDir, 'shots', target, `${id}.png`));
+  const files = dirs.map(dir => path.join(dir, `${id}.png`));
   if (!files.every(existsSync)) return { ...result, reason: 'missing counterpart' };
   if (!shot) return { ...result, reason: 'unknown shot id' };
   const [metaA, metaB] = await Promise.all(files.map(file => readMeta(file.replace(/\.png$/, '.json'))));
+  result.runIds = [metaA.runId ?? null, metaB.runId ?? null];
   result.warnings = compareMetas(metaA, metaB);
   if (JSON.stringify(metaA.regions ?? []) !== JSON.stringify(metaB.regions ?? [])) result.warnings.push('regions differ between sites (original used)');
   const regions = selectRegions(metaA.regions?.length ? metaA.regions : metaB.regions, regionRequest);
   const [originalUrl, cloneUrl] = (await Promise.all(files.map(file => readFile(file)))).map(dataUrl);
-  const devicePixelRatio = metaA.devicePixelRatio ?? metaB.devicePixelRatio ?? 1;
-  const outcome = await page.evaluate(diffInPage, { originalUrl, cloneUrl, threshold: CHANNEL_DIFF_THRESHOLD, regions, devicePixelRatio });
+  const devicePixelRatio = metaA.devicePixelRatio ?? metaB.devicePixelRatio ?? metaA.viewport?.deviceScaleFactor ?? 1;
+  // Masked pixels (same colour on both sites) are excluded on both sides: the union of both sites' rects.
+  const masks = [...(metaA.maskRects ?? []), ...(metaB.maskRects ?? [])];
+  // A masked shot without measured rects would count the mask as agreement: fail instead of judging loosely.
+  const masksMissing = shot.dom?.mask?.length > 0 && !(metaA.maskRects?.length && metaB.maskRects?.length);
+  const outcome = await page.evaluate(diffInPage, { originalUrl, cloneUrl, threshold: CHANNEL_DIFF_THRESHOLD, regions, devicePixelRatio, masks });
   if (outcome.sizeMismatch) return { ...result, reason: `size mismatch ${outcome.sizeMismatch.join('x')}` };
-  await writeFile(path.join(inDir, 'compare', `${id}.png`), Buffer.from(outcome.heatmap.split(',')[1], 'base64'));
+  await writeFile(path.join(outDir, 'compare', `${id}.png`), Buffer.from(outcome.heatmap.split(',')[1], 'base64'));
   result.metrics = outcome.metrics;
   result.regions = outcome.regionMetrics.map(crop => ({ ...crop, pass: evaluateThresholds(crop.metrics, thresholdClass).pass }));
   const errors = [...(metaA.pageErrors ?? []), ...(metaB.pageErrors ?? [])];
   const pass = result.regions.length > 0 ? result.regions.every(crop => crop.pass) : evaluateThresholds(outcome.metrics, thresholdClass).pass;
   const readPng = async (target, shotId) => {
-    const file = path.join(inDir, 'shots', target, `${shotId}.png`);
+    const file = path.join(dirs[target === 'original' ? 0 : 1], `${shotId}.png`);
     return existsSync(file) ? { png: await readFile(file), meta: await readMeta(file.replace(/\.png$/, '.json')) } : null;
   };
   const measure = async (a, b) => (await page.evaluate(diffInPage, { originalUrl: dataUrl(a), cloneUrl: dataUrl(b), threshold: CHANNEL_DIFF_THRESHOLD, regions: [], devicePixelRatio: 1 })).metrics;
   result.intraSite = await runIntraSiteChecks({ shot, metas: { original: metaA, clone: metaB }, readPng, measure });
-  result.pass = pass && errors.length === 0 && result.intraSite.pass;
-  if (errors.length > 0) result.reason = `page errors: ${errors.join(' | ')}`;
+  const [consoleA, consoleB, boxesA, boxesB] = await Promise.all([
+    ...dirs.map(dir => sidecar(dir, id, '.console.json')), ...dirs.map(dir => sidecar(dir, id, '.boxes.json'))]);
+  // A same-site repeat (noise floor) compares pixels and log order only; errors are judged per site elsewhere.
+  if (consoleA || consoleB || SIGNOFF_IDS.includes(id)) result.console = compareConsoleRecords(consoleA, floor && consoleB ? { ...consoleB, errors: [] } : consoleB);
+  if (shot.dom?.boxes?.length > 0) result.boxes = compareBoxes(boxesA, boxesB);
+  const sideChecks = [result.console, result.boxes].filter(Boolean);
+  result.pass = pass && !masksMissing && errors.length === 0 && result.intraSite.pass && sideChecks.every(check => check.pass);
+  if (masksMissing) result.reason = 'mask rects missing from a meta (recapture)';
+  else if (errors.length > 0) result.reason = `page errors: ${errors.join(' | ')}`;
   else if (!pass) result.reason = 'over threshold';
   else if (!result.intraSite.pass) result.reason = result.intraSite.failures.join('; ');
+  else if (result.console && !result.console.pass) result.reason = result.console.reason;
+  else if (result.boxes && !result.boxes.pass) result.reason = `boxes differ: ${JSON.stringify(result.boxes.differences)}`;
   return result;
 }
 
 async function main() {
   const { values } = parseArgs({
-    options: { shots: { type: 'string' }, in: { type: 'string', default: '.parity-output' }, region: { type: 'string', default: 'all' } },
+    options: {
+      shots: { type: 'string' }, in: { type: 'string', default: '.parity-output' }, region: { type: 'string', default: 'all' },
+      a: { type: 'string' }, b: { type: 'string' },
+    },
   });
   const inDir = path.resolve(values.in);
-  const ids = values.shots
-    ? values.shots.split(',').map(id => id.trim()).filter(Boolean)
-    : [...new Set([...await pngNames(path.join(inDir, 'shots', 'original')), ...await pngNames(path.join(inDir, 'shots', 'clone'))])].sort();
-  await mkdir(path.join(inDir, 'compare'), { recursive: true });
+  const floor = Boolean(values.a && values.b);
+  const dirs = floor ? [path.resolve(values.a), path.resolve(values.b)] : ['original', 'clone'].map(target => path.join(inDir, 'shots', target));
+  const outDir = floor ? path.join(inDir, 'noise-floor') : inDir;
+  const ids = values.shots === 'signoff' ? resolveSignoffIds('signoff')
+    : values.shots ? values.shots.split(',').map(id => id.trim()).filter(Boolean)
+      : [...new Set([...await pngNames(dirs[0]), ...await pngNames(dirs[1])])].sort();
+  await mkdir(path.join(outDir, 'compare'), { recursive: true });
   const { browser } = await launchParityBrowser('angle');
   const report = { generatedAt: new Date().toISOString(), shots: {} };
   try {
@@ -160,16 +132,25 @@ async function main() {
     await page.goto('about:blank');
     await page.addScriptTag({ content: `window.computeDiffMetrics = ${computeDiffMetrics}; window.toDeviceRegion = ${toDeviceRegion};` });
     for (const id of ids) {
-      const result = await compareOne(page, inDir, id, values.region);
+      const result = await compareOne(page, { dirs, outDir, floor }, id, values.region);
+      if (floor && result.metrics && result.thresholdClass) result.floorShare = noiseFloorShare(result.metrics, result.thresholdClass);
       report.shots[id] = result;
       const numbers = describeMetrics(result.metrics) + (result.regions ?? []).map(crop => ` [${crop.name} ${describeMetrics(crop.metrics)}]`).join('');
       const verdict = result.pass ? 'PASS' : 'FAIL';
-      console.log(`${result.reportOnly ? `REPORT(${verdict})` : verdict} ${id} ${numbers}${result.reason ? ` (${result.reason})` : ''}${result.warnings.length ? ` warnings: ${result.warnings.join('; ')}` : ''}`);
+      const share = result.floorShare === undefined ? '' : ` floor ${(result.floorShare * 100).toFixed(1)} % of limit`;
+      console.log(`${result.reportOnly ? `REPORT(${verdict})` : verdict} ${id} ${numbers}${share}${result.reason ? ` (${result.reason})` : ''}${result.warnings.length ? ` warnings: ${result.warnings.join('; ')}` : ''}`);
     }
   } finally {
     await browser.close();
   }
-  await writeFile(path.join(inDir, 'compare-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(path.join(outDir, 'compare-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  // Full sign-off sets only get their own report, so later subset runs cannot change the research exceptions.
+  if (values.shots === 'signoff' && !floor) {
+    const runIds = new Set(Object.values(report.shots).flatMap(result => result.runIds ?? [null]));
+    const runId = runIds.size === 1 ? [...runIds][0] : null;
+    await writeFile(path.join(outDir, 'compare', 'signoff-report.json'), `${JSON.stringify({ ...report, runId, ids }, null, 2)}\n`);
+  }
+  await writeFile(path.join(outDir, 'compare', 'summary.md'), signoffSummaryMarkdown(report.shots, { generatedAt: report.generatedAt }));
   // Report-only shots never fail the run; their metrics are kept for review.
   if (Object.values(report.shots).some(result => !result.pass && !result.reportOnly)) process.exitCode = 1;
 }

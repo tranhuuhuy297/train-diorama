@@ -18,7 +18,7 @@ next phase starts. Dependencies are listed as the phases whose output a phase re
 | P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Complete |
 | P12 | Water, clouds, balloon | P05 | Complete |
 | P13 | Station travellers, birds | P06, P09 | Complete |
-| P14 | Full-scene parity signature, deployment prep | P01–P13 | Pending |
+| P14 | Full-scene parity sign-off, performance budget, docs, deployment prep | P01–P13 | Complete (deploy awaits approval) |
 
 P01 delivers a runnable shell: the loader resolves, the HUD is fully interactive, settings
 persist, and `src/engine/diorama.js` is a facade stub that P03 replaces at the same path without
@@ -160,3 +160,55 @@ last build step with bit-identical records. Node parity is bit-identical: first-
 `[BIRDS]` / `[STATION]` / `[VILLAGE]` lines per frame. The three new shots are pixel-identical,
 `cloneMissing` is retired, the active stage is `full-scene`, and the frozen default overview now
 matches the original's renderer counts exactly (1373 / 1,762,696 / 419 / 6 / 25).
+
+P14 signs the clone off as release 1.0.0. In node, the whole scene (1201 signature entries: world,
+birds, train, sparks, sky, 70 puffs) is identical to the original oracle, as are the ordered lists
+(scene children, glow registry, shadow-hidden list), the world summary and the next `world.rand()`
+draw; 10 800 lockstep frames across overview, train, bridge, free, night and a 2.5× train keep every
+scalar bitwise equal with identical `[SHEEP]` / `[BIRDS]` / `[STATION]` / `[VILLAGE]` lines. In the
+browser, 21 full-page 3D shots and 7 DOM shots, the 8 frozen probe states, the performance budget,
+the research recapture and the smoke check are run against the original; results are recorded in
+`parity-testing-guide.md` ("Sign-off results"). Deploying to Vercel is prepared (config, analytics
+gate, deployment guide) and waits for explicit approval; GitHub Pages follows `main`.
+
+## Post-parity backlog (out of scope; each changes a parity baseline and needs approval)
+
+Quirks kept on purpose so the clone matches the reference. Fixing any of them is a deliberate
+departure from parity.
+
+| # | quirk | where | possible fix |
+|---|---|---|---|
+| 1 | Right-click on a toggle toasts the stale label | HUD bindings | use the post-render label |
+| 2 | X returns to 1× instead of the previous scale | keyboard / HUD actions | remember the previous scale |
+| 3 | `paused`, mode and HUD visibility persist; a reload may start paused or hidden while the "H · Hide HUD" toast still shows | settings / boot | do not persist `paused`; skip the toast when hidden |
+| 4 | Time slider toasts on every input event; focused inputs swallow shortcuts | HUD bindings / keyboard | toast on change; blur on Esc |
+| 5 | Free-camera toast is nowrap and overflows its box on desktop | toast CSS | allow wrapping |
+| 6 | `PointerLockControls.lock(true)` rejection is uncaught, so Free never locks where unadjusted movement is unsupported | free-fly camera | fall back to `lock()` |
+| 7 | Time of day uses unclamped real dt (instant after a background tab) | time of day | clamp realDt |
+| 8 | Free camera clamps apply only while moving | free-fly camera | clamp every frame |
+| 9 | Fly-along elapsed time uses real dt, so its periods ignore the time scale; the side is chosen once at entry | train camera | use sim dt; re-pick the side |
+| 10 | The bridge camera overwrites `controls.target`; re-pressing 2 in Free re-logs, re-toasts and re-saves | camera director | keep the target; ignore same-mode presses |
+| 11 | Tree sway is absent from shadows | shadow pass | sway-aware depth material |
+| 12 | The 70-puff pool is exhausted at top speed (emission silently skipped) | smoke pool | larger pool |
+| 13 | Brake-strength spike when the speed slider drops while braking (capped at 1); dt 0 gives strength 1 | motion controller | rate-limit; guard dt 0 |
+| 14 | Coupling rods stay still while the wheels turn; `s` is never wrapped | wheels / motion | animate rods; wrap s |
+| 15 | Sleeper seam gap just before s = 0 | track | even spacing |
+| 16 | Height-texture half-texel offset shifts the shoreline by up to 0.3; 8-bit quantisation | terrain / water | align texel centres |
+| 17 | Station sign renders darker (sRGB texture), stays bright at night, ignores fog and shadows | station sign | NPR sign material |
+| 18 | Sign font race falls back to sans-serif when Fredoka is late | station sign | await the font before the build |
+| 19 | Hard throws at boot (fewer than 2 houses; no flock site) | village / sheep | logged fallbacks |
+| 20 | Pasture sheep with no ground height sink toward y = 0 | sheep locomotion | keep the last height |
+| 21 | Track-sheep danger ignores train speed; the station-roof flock circles through the 4 s dwell; trackside-1 is a dead cluster | sheep FSM / birds | speed-aware checks |
+| 22 | Scale-0 clouds and puffs still issue draw calls; cloud wrap zeroes the avoidance offset; avoidance assumes uniform scale | clouds / smoke | hide at scale 0 |
+| 23 | Sheep clearings are excluded after the trees (overlaps possible); rocks and trees ignore each other | build order | exclude before scattering (changes layout) |
+| 24 | OrbitControls damping is per frame (feel depends on frame rate) | overview camera | dt-based damping |
+| 25 | Bird bank angle depends on dt; the walker's shoe has no ankle pitch; head-look distance is measured from the figure origin | birds / station life | dt-independent bank; ankle; head origin |
+| 26 | Residents turn 0 → 0.2 rad at load; the woman's non-uniform scale shades with unnormalised normals | village residents | settle pose; normal matrix |
+| 27 | The waterfall drops to y ≈ −18; balloon yaw ignores its heading; burner and flame sit outside the local glow | water / balloon | trim; face heading; include them |
+| 28 | Shrub heights are sampled before the windmill pad; shutter angles repeat every 4 houses; the windmill is unmerged (65 draws per pass) | village / windmill | sample after pads; merge |
+
+Other follow-ups needing approval: CI parity job against the cached original, subresource
+integrity in the import map, `modulepreload` hints for the unbundled module graph (LOAD ENGINE was
+faster than the original's in the sign-off run, but that compared localhost with a remote deploy), and
+a Vercel deploy.
+

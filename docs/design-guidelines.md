@@ -44,6 +44,22 @@
 15. **Persistence:** settings saved to `localStorage['train-scene-settings-v2']`, validated per
     key, falling back to defaults wholesale when anything is invalid.
 
+## Contact-sheet procedure (visual review)
+
+1. Serve the clone (`npm run dev`) and run `npm run parity:research`. It stages the research capture
+   script into `.parity-cache/research-recapture/` (never run in place), runs its main and extras
+   passes against the clone and copies the 28 PNGs and both logs to `.parity-output/research-recapture/`.
+2. Open `.parity-output/research-recapture/research-contact-sheet.html`: each research shot sits next
+   to the clone's recapture at 640 px with both top-10 colour-chip rows and the palette overlap score.
+3. A shot passes at overlap ≥ 7/10. A failing shot reruns its pass once; if it still fails it is
+   accepted only when its deterministic sign-off equivalent passed (`RESEARCH_EQUIVALENTS`) in
+   `.parity-output/compare/signoff-report.json`, which only `compare --shots signoff` writes and which
+   must cover every sign-off shot from one capture run (else exceptions are disabled), with the
+   cause written into the parity guide (wall-clock timing; for 01-loading-screen also the original
+   logo artwork, which the dom-loading shot masks).
+4. Tick the style bible items 1–15 against the sheet and the sign-off shots; record the result in
+   the parity guide ("Sign-off results").
+
 ## HUD tokens (this phase)
 
 | Token | Value |

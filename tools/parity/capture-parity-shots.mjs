@@ -1,5 +1,6 @@
 // CLI: captures the selected parity shots on the original and/or the clone into <out>/shots/<target>/.
-// Usage: node tools/parity/capture-parity-shots.mjs [--target clone|original|both] [--shots a,b] [--stage s] [--profile p] [--out dir]
+// Usage: node tools/parity/capture-parity-shots.mjs [--target clone|original|both] [--shots a,b|signoff] [--stage s] [--profile p] [--out dir]
+// [--repeat] (sign-off only: writes into shots/<target>-repeat for the noise floor)
 import { parseArgs } from 'node:util';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,6 +15,8 @@ import { setCaptureCss, runDomActions, waitForCssSettled, clipForSelectors } fro
 import { ACTIVE_PARITY_STAGE, selectShots, expandHideSets } from './parity-shot-list.mjs';
 import { computeShotRegions } from './shot-region-projection.mjs';
 import { applyShotActions } from './page-shot-actions.mjs';
+import { SIGNOFF_SHOTS, isSignoffSelection, resolveSignoffIds } from './signoff-parity-shots.mjs';
+import { captureSignoffTarget } from './signoff-shot-capture.mjs';
 
 const STEP_SECONDS = 1 / 60;
 const MASK_COLOR = '#ff00ff';
@@ -116,12 +119,13 @@ async function main() {
     options: {
       target: { type: 'string', default: 'both' }, shots: { type: 'string' },
       stage: { type: 'string', default: ACTIVE_PARITY_STAGE }, profile: { type: 'string', default: 'angle' },
-      out: { type: 'string', default: '.parity-output' },
+      out: { type: 'string', default: '.parity-output' }, repeat: { type: 'boolean', default: false },
     },
   });
   const targets = values.target === 'both' ? ['original', 'clone'] : [values.target];
+  const signoff = isSignoffSelection(values.shots);
   const ids = values.shots ? values.shots.split(',').map(id => id.trim()).filter(Boolean) : null;
-  const shots = selectShots({ ids, stage: values.stage });
+  const shots = signoff ? resolveSignoffIds(values.shots).map(id => SIGNOFF_SHOTS.find(shot => shot.id === id)) : selectShots({ ids, stage: values.stage });
   const outDir = path.resolve(values.out);
   // Shared by every meta of this invocation, so compare can flag stale shots left by another run.
   const runId = new Date().toISOString();
@@ -130,10 +134,14 @@ async function main() {
     const launched = await launchParityBrowser(values.profile);
     browser = launched.browser;
     const metas = [];
+    // One sign-hash reference for the whole run (first font-ready load, the original's when both run).
+    const signReference = { hash: null };
     for (const target of targets) {
-      metas.push(...await captureTarget(browser, target, shots, { profile: values.profile, executablePath: launched.executablePath, outDir, runId }));
+      const options = { profile: values.profile, executablePath: launched.executablePath, outDir, runId, signReference };
+      if (signoff) metas.push(...await captureSignoffTarget(browser, target, shots, { ...options, dirName: values.repeat ? `${target}-repeat` : target }));
+      else metas.push(...await captureTarget(browser, target, shots, options));
     }
-    await writeFile(path.join(outDir, 'capture-log.json'), `${JSON.stringify({ generatedAt: new Date().toISOString(), runId, metas }, null, 2)}\n`);
+    await writeFile(path.join(outDir, signoff ? 'signoff-capture-log.json' : 'capture-log.json'), `${JSON.stringify({ generatedAt: new Date().toISOString(), runId, metas }, null, 2)}\n`);
   } finally {
     await browser?.close();
     await stopCloneServer();

@@ -1,12 +1,15 @@
 // Build-free static server: no bundler, refuses dotfiles and the modules folder.
+// Usage: node tools/static-dev-server.mjs [--root dir] [--port n] (defaults: repo root, PORT or 4317)
 import { createServer } from 'node:http';
+import { parseArgs } from 'node:util';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const PORT = Number(process.env.PORT ?? 4317);
+const { values: options } = parseArgs({ options: { root: { type: 'string' }, port: { type: 'string' } } });
+const ROOT = resolve(options.root ?? fileURLToPath(new URL('..', import.meta.url)));
+const PORT = Number(options.port ?? process.env.PORT ?? 4317);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const MODULES_DIRECTORY = 'node_modules';
 

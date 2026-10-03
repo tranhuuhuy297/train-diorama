@@ -31,7 +31,7 @@ oracle (via gitignored `.parity-cache/`), never as a text source.
 - **D8 Tooling.** Shell commands never reference `node_modules`/`build`/`vendor` path segments;
   tool *file contents* may still contain those literal names.
 
-## Scope (this phase: P01)
+## Scope of the first phase (P01)
 
 In scope: page shell, import map, hand-written utility CSS, bottom HUD panel, night theme,
 shortcuts help panel, settings persistence, keyboard shortcuts, shortcut toast, weighted loading
@@ -43,7 +43,7 @@ world/terrain/track/bridge (P05), station (P06), train model and motion (P07), v
 (P08), residents/trees/rocks (P09), free-fly camera completion (P10), sheep (P11), water/clouds/
 balloon (P12), station travellers and birds (P13), and the debug menu + parity test harness (P04).
 
-## Feature → phase map (this phase)
+## Feature → phase map (P01; all 147 IDs are traced in `codebase-summary.md`)
 
 | Feature | Description |
 |---|---|
@@ -84,3 +84,23 @@ compared by layout only, never by pixel content.
 
 None outstanding for this phase. The logo/favicon design question is settled (original artwork,
 D7); see `design-guidelines.md` for the concrete spec.
+
+## Acceptance status (release 1.0.0)
+
+| requirement | status |
+|---|---|
+| Node parity: construction signature, ordered lists, world summary, 10 800 lockstep frames, log sequences | met (`full-scene-signature-parity.test.mjs`) |
+| `npm test` 0 fail / 0 skipped with the oracle cache; `check:lines` | met (295 tests; max 199 lines) |
+| Browser sign-off: 21 3D + 7 DOM shots within thresholds, equal log sequences, 0 clone errors, loader boxes ≤ 0.5 px | met (28/28, max channel diff ≤ 1) |
+| Runtime probe: 8 frozen states exactly equal (counts, summary, lists, instanced counts, sign hash) | met |
+| Performance: BUILD and CPU-submit medians ≤ 1.10× the original; heap growth and allocation per step | met (BUILD 1.026×, CPU 0.983× / 1.000×, heap +25.6 KB, allocation 0.73×) |
+| Research recapture: 28 shots with palette overlap ≥ 7/10 | met (all ≥ 8/10, no exceptions) |
+| Independence audit (D0/D7): only allowed overlap hits, no citations, own logo/favicon | met (owner's visual confirmation of the logo pending) |
+| 147 feature IDs traced to one owner each with files and a covering test | met (`codebase-summary.md`) |
+| Docs final, deployment guide | met |
+| Deploy | prepared; Vercel deploy awaits explicit approval; GitHub Pages follows `main` |
+
+Open questions for the owner: deploy to Vercel at all, public or behind Deployment Protection, and
+which scope, project name and domain; whether to keep the `?parity` hook on production (default:
+keep, it is harmless); whether `modulepreload` hints or SRI should be added post-parity.
+

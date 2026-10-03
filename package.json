@@ -1,6 +1,6 @@
 {
   "name": "train-diorama",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Independent from-scratch re-implementation of the Train Diorama Three.js scene",
@@ -15,7 +15,11 @@
     "test:parity": "node --test --test-concurrency=1 \"tests/parity/*.test.mjs\"",
     "parity:capture": "node tools/parity/capture-parity-shots.mjs",
     "parity:compare": "node tools/parity/compare-parity-shots.mjs",
-    "parity:probe": "node tools/parity/runtime-counts-probe.mjs"
+    "parity:probe": "node tools/parity/runtime-counts-probe.mjs",
+    "parity:signoff": "node tools/parity/capture-parity-shots.mjs --shots signoff --target both && node tools/parity/compare-parity-shots.mjs --shots signoff && node tools/parity/runtime-counts-probe.mjs --states signoff",
+    "parity:perf": "node tools/parity/performance-budget-probe.mjs",
+    "parity:research": "node tools/parity/research-recapture-and-contact-sheet.mjs",
+    "parity:smoke": "node tools/parity/deployment-smoke-check.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.0",

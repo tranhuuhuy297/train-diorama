@@ -20,6 +20,14 @@ python3 <plan-dir>/research/verbatim-overlap-check.py <plan-dir> <changed files>
 Every reported chunk must be a single declaration, URL or UI string fully dictated by a value in
 the relevant phase file; anything else gets rewritten.
 
+Before a release, run the whole independence audit (commands and allowance table in
+`parity-testing-guide.md`, "Independence audit"): the overlap checker over every tracked file, the
+structural-similarity checker (no file above 0.30 except the DOM-dictated `index.html`), the
+file:line citation grep, the SVG hash comparison, and `git ls-files .parity-cache .parity-output`
+(must print nothing). Write new code from the phase's tables and prose, never from the original's
+text; when an audit hit falls outside the allowances, rewrite the passage in its owning module and
+rerun that module's parity tests.
+
 ## File rules (R1–R12 digest)
 
 - **R1 Runtime:** vanilla ESM, no bundler; `three@0.186.0` via import map; Node tests resolve the
@@ -120,6 +128,25 @@ into a shell command.
   bag and the `npr()` cache are process-global and shared across the whole test file.
 - **No original file:line citations in code comments**, ever — phase files may cite them as a
   behaviour reference; `src/`/`tests/`/`tools/` never do.
+
+## Rules learned in the sign-off triage
+
+- **Fix at the lowest failing layer.** Node signature → node lockstep scalars and log lines →
+  browser ordered lists and counts → browser pixels → perf. A pixel diff with equal signatures and
+  lists points at shader output, uniforms, renderer settings, material creation order (the
+  `material.id` tie-break in the renderer's stable sort) or DOM/CSS.
+- **Never loosen a threshold or compensate in the harness.** A drift is fixed in its owning module
+  (traceability table in `codebase-summary.md`) with a regression assertion in that module's test.
+- **Instance dispatch is a contract.** The frame loop reads `updateTimeOfDay`, `updateCamera`,
+  `world.updateCloudCamera` and `render` from the instance every frame; caching a reference would
+  silently disable the harness overrides on the clone only.
+- **Font readiness is judged in the build task.** The station sign is drawn during construction;
+  the hook's `fredokaReadyAtBuild` (same task) decides a reload, not the earlier loader label; a
+  sign-canvas hash that differs from the run's reference reloads too (same budget of 2).
+- **One browser context per sign-off shot**, and every wait is on state (loader hidden, toast
+  settled, frames processed), never on wall-clock time: headless SwiftShader runs near 2 FPS.
+- **Lockstep stepping swaps `Math.random` and `console.log` per side** only for the duration of
+  that side's step, restoring both even on a throw.
 
 ## Git and commits
 

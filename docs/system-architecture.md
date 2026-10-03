@@ -1,7 +1,9 @@
 # System architecture
 
-Mirrors the project's cross-module contracts. This file is a living summary; later phases append
-their own sections (engine, world, train, life) without rewriting what is here.
+Mirrors the project's cross-module contracts. Sections were appended phase by phase (engine, world,
+train, life); the closing section "Release 1.0.0: consolidated view" is the final mirror of the
+contracts (§1–§5), the parity hook, the module dependency graph, the data flow and the files outside
+the unified tree. Where an earlier section says "this phase", read it as the phase that wrote it.
 
 ## Runtime
 
@@ -1027,3 +1029,101 @@ Diorama.dispose                   … disposeFirstPersonControls → controls li
 - `tests/helpers/clone-simulation-driver.mjs`: birds in composition order (via
   `createWorldBirdSystem`) and `snapshotLifeState(ctx)` (birds, flock modes, walker, grandmother).
   `tests/helpers/sheep-flock-parity-lockstep.mjs`: `runSheepLockstep` takes `logPrefixes`.
+
+## Release 1.0.0: consolidated view
+
+### Contracts mirror (§1–§5, final)
+
+**§1 Public APIs (by layer).**
+
+| layer | modules and entry points |
+|---|---|
+| core | `mulberry32(seed)`, `noise2`, `fbm(x, y, oct = 4)` (lacunarity 2.03, ×1.6), `smoothstep(a, b, x)` (reversed edges allowed), `lerp`; `wrapAngle`, `positiveModulo`, `exponentialResponse`; colour management off (side-effect module, first import) |
+| materials | `G`, `NIGHT_UNIFORMS`, `LIGHTING_UNIFORMS`, `NIGHT_LIGHT_GLOW_MATERIAL_NAME`; `npr(options)` (identity = explicit option pairs, R7); `skyMaterial()`, `waterMaterial(heightTex, size)`, `waterfallMaterial()` |
+| effects / geometry | `createLightCone`, `createLightGlows(lights)`; `mergeStaticGeometry(root, excluded)`, `box`, `colorize`, `tintGeometry`, `jitter`, `extrude`, `addWallVent`, `addRoofVent` |
+| engine | `Diorama` (`setMode`, `setTimeOfDay(id, immediate)`, `setPixelResolution`, `setOutline`, `setAutoRotate`, `prepareOverviewIntro`, `logCameraPose`, `updateTrain`, `updateCamera`, `render`, `dispose`; parity fields `time s speed stopTimer justLeft puffTimer camPos camTarget flyAlong* paused timeScale speedMul`); `composeDioramaScene`, `createWorldBirdSystem`; `createFrameLoop`, `stepSimulation`, `renderDioramaFrame`; camera rigs (`setCameraMode`, `updateCameraRig`, free-fly, fly-along, bridge tripod); `installParityTestHook` |
+| world | `World({stopAfter, skip})` with `heightAt`, `nearest`, `inBridge`, `excluded`, `pointAtS`, `tangentAtS`, `sheepGroundAt`, `treeCanopyHeightAt`, `update(elapsed, dt, trainPosition, trainMotion)`, `updateCloudCamera(cameraPosition, dt)`; `WORLD_BUILD_STEPS` |
+| train / life | `Train` (`update(world, s)`), `BrakeSparks`, `LocomotiveSmokePuffPool`, `initTrainMotion`, `updateTrainAndEffects`, `writeHeadlightUniforms`; `createBirdSystem`, `VillageResidents`, `StationWalker`, sheep FSM and pose writer |
+| ui | settings schema + persistence, HUD renderers/actions/bindings, keyboard shortcuts, toast, loading-step runner, `mountDebugMenu(diorama)` |
+
+**§2 Shared lighting bag.** One singleton of `{value}` objects: `G` (16 keys in the fixed order
+uLightDir … uSunColor) plus `uNight`, `uSaturation` and the headlight pair. Consumers hold references,
+never copies. Writers: palettes (12 keys, real dt), the sim step (`uTime`), the shadow pass
+(`uShadowMap`, `uShadowTexel`, `uShadowMatrix`), the render pipeline (headlight pair).
+
+**§3 PRNG streams.** A = `mulberry32(1337)` noise tables at module evaluation; W = `world.rand` =
+`mulberry32(42)` (village W1, windmill W2, trees W4, rocks + pasture sheep W5, clouds W7, the last
+consumer); B = `mulberry32(7821)` per bird system; M = `Math.random` for puffs, sparks and three's
+UUIDs (statistical; tests reseed it per side).
+
+**§4 Construction order.** Boot: settings → HUD → loading steps (LOADING ENGINE 30, BUILDING VALLEY
+AND TRAIN 60 with the parity hook last, PREPARING FIRST FRAME 10) → `[GAMEPLAY] Started` → intro →
+debug menu → `H · Hide HUD`. Diorama: fields → renderer → camera + controls → composition (world,
+birds, free pose, train, sparks, motion init, sky, 70 puffs, shadow-hidden list, glow registry) →
+shadow pass → main RT + post → `setTimeOfDay('day', true)` → resize → first loop call. World build
+steps 1–16 in the fixed registry order (track frames … bird perches).
+
+**§5 Per-frame order.** Cadence gate (1000/120 ms) → `updateTimeOfDay(realDt)` →
+`world.nightAmount ← uNight` → if running: time/uTime, `updateTrain`, `world.update` (slots 1–11),
+`birds.update` → `updateCamera(dt)` → `world.updateCloudCamera` → `render` (glows, headlight, sky
+follow, one matrix update, shadow, main, post) → frame and CPU EMAs (α 0.1). Every member is read
+from the instance each frame (instance dispatch), which the parity overrides rely on.
+
+### Parity hook
+
+`?parity` exposes `window.__diorama` and records `__parityBuildInfo` (Fredoka readiness in the build
+task); `?parity=freeze` also pauses the diorama, unpersisted. It runs right after
+`prepareOverviewIntro()`, the same point the test browser patches into the original's entry module,
+so both sites are frozen after exactly one 0.05 s step. It is harmless in production (no user data).
+
+### Module dependency graph
+
+```
+ui (settings, HUD, keys, toast, loader) ──► engine/diorama (dynamic import) ──► engine/* (loop, sim step, render, cameras)
+                                                 │
+                     engine/diorama-scene-composition ──► world/world ──► world/* builders ──► geometry/*, materials/*
+                                                 ├──► train/*  ──► materials/npr, effects/*, geometry/merge
+                                                 └──► life/birds ◄── world.birdPerches; life/sheep, life/station, life/village ◄── world build steps
+core/* (PRNG, noise, scalar maths, colour management) is imported by every layer; nothing imports ui/ except main-entry.
+```
+
+### Data flow (one frame)
+
+User input → HUD actions → `Diorama` setters → per-frame loop → sim step (train → world slots →
+birds) → camera rig → cloud camera → render (shadow → main → post) → canvas. Logs (`[CAMERA]`,
+`[GAMEPLAY]`, `[BIRDS]`, `[SHEEP]`, `[STATION]`, `[VILLAGE]`, `[HUD]`, `[PAUSE]`, `[DEBUG]`,
+`[SETTINGS]`) are the observable event stream; the parity harness compares them per shot.
+
+### Files outside the unified tree
+
+The list with creating phases is in `codebase-summary.md`. Their roles in the test and parity graph:
+
+| role | files |
+|---|---|
+| node oracle plumbing | `tests/helpers/quantised-number-hashing.mjs`, `tests/helpers/scene-signature-key-builders.mjs`, `tests/helpers/oracle-camera-controls-stub.mjs`, `tests/helpers/typed-array-fnv1a-hash.mjs`, `tests/helpers/counted-full-world-builds.mjs`, `tests/helpers/world-summary-digest.mjs` (also injected into pages) |
+| node lockstep and fixtures | `tests/helpers/sheep-flock-parity-lockstep.mjs`, `tests/helpers/station-travelers-and-birds-first-build.mjs`, `tests/helpers/smoke-puff-behaviour-checks.mjs`, `tests/helpers/fresh-process-train-material-ids.mjs`, `tests/parity/fixtures/station-travelers-and-birds-expected.json` |
+| per-subsystem shot lists | `tools/parity/camera-mode-parity-shots.mjs`, `sheep-flock-parity-shots.mjs`, `water-clouds-balloon-parity-shots.mjs`, `station-travelers-and-birds-parity-shots.mjs`, `signoff-parity-shots.mjs` |
+| per-subsystem probe sections | `tools/parity/station-runtime-probe.mjs`, `village-windmill-runtime-probe.mjs`, `forest-residents-runtime-probe.mjs`, `sheep-flock-runtime-probe.mjs`, `water-clouds-balloon-runtime-probe.mjs`, `station-travelers-and-birds-runtime-probe.mjs`, `scenario-probe-sections.mjs`, `signoff-state-probe.mjs` |
+| capture/compare internals | `tools/parity/dom-shot-page-helpers.mjs`, `page-hide-set-application.mjs`, `page-shot-actions.mjs`, `shot-region-projection.mjs`, `intra-site-shot-checks.mjs`, `parity-shot-factory-and-camera-poses.mjs`, `parity-shot-stages-and-hide-sets.mjs`, `parity-shot-validation.mjs`, `png-diff-in-page.mjs`, `signoff-page-helpers.mjs`, `signoff-shot-capture.mjs`, `signoff-shot-verdicts.mjs` |
+| sign-off CLIs and maths | `tools/parity/parity-metrics-math.mjs`, `performance-budget-probe.mjs`, `research-recapture-and-contact-sheet.mjs`, `deployment-smoke-check.mjs` |
+| browser checks | `tools/parity/hook-and-debug-menu-browser-checks.mjs`, `post-pass-synthetic-input-probe.mjs`, `camera-ui-runtime-probe.mjs`, `probe-result-diffing.mjs`, `research-capture-paths.mjs` |
+| runtime helper | `src/life/station/station-figure-parts.js` (traveler figures) |
+
+### Sign-off tooling (release 1.0.0)
+
+```
+node:    original-simulation-oracle ─┐                         world-summary-digest (self-contained)
+         clone-simulation-driver ────┴─► full-scene-signature-parity.test.mjs (signature, R9 lists, summary, 10 800 lockstep frames)
+browser: capture --shots signoff ─► shots/{original,clone}/<id>.png + .json + .console.json (+ .boxes.json)
+         compare --shots signoff ─► compare/<id>.png, compare-report.json, compare/signoff-report.json, compare/summary.md   (--a/--b: noise floor)
+         probe --states signoff  ─► probe/<state>.json (renderer counts, digests, s mod L; exact)
+         parity:perf ─► perf/perf.json · parity:research ─► research-recapture/ · parity:smoke --url ─► smoke/<host>.json
+```
+
+The clone simulation driver composes its scene with the runtime `composeDioramaScene` (an injected
+original World is composed around in the same order, for train-only isolation) and applies the render's
+GPU-free side effects (glow visibility, headlight uniforms, sky follow) each step, so the node oracle and
+the clone driver describe the same full scene and the R9 checks exercise the real composition. The
+lockstep arms the overview intro on both sides (the original's `prepareOverviewIntro` vs the clone's
+pose helper) so intro completion and the mode-selection interrupt are compared too.
+
