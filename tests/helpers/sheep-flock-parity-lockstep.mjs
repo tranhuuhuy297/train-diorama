@@ -50,8 +50,9 @@ export function firstSheepFlockMismatch(originalWorld, cloneWorld) {
 }
 
 /** Steps both sides `frames` times (frame numbers start at 1) and stops at the first mismatch `compare`
- * reports. Math.random and console.log are swapped per side and always restored. */
-export function runSheepLockstep({ frames, stepOriginal, stepClone, beforeFrame = () => {}, compare }) {
+ * reports. Math.random and console.log are swapped per side and always restored; log lines starting
+ * with one of `logPrefixes` are kept with their frame number. */
+export function runSheepLockstep({ frames, stepOriginal, stepClone, beforeFrame = () => {}, compare, logPrefixes = ['[SHEEP]'] }) {
   const logs = { original: [], clone: [] };
   const streams = { original: mulberry32(LOCKSTEP_RANDOM_SEED), clone: mulberry32(LOCKSTEP_RANDOM_SEED) };
   const realRandom = Math.random;
@@ -60,7 +61,7 @@ export function runSheepLockstep({ frames, stepOriginal, stepClone, beforeFrame 
   let frame = 0;
   console.log = (...args) => {
     const message = args.map(String).join(' ');
-    if (side !== null && message.startsWith('[SHEEP]')) logs[side].push([frame, message]);
+    if (side !== null && logPrefixes.some(prefix => message.startsWith(prefix))) logs[side].push([frame, message]);
   };
   const runSide = (name, step) => {
     side = name;

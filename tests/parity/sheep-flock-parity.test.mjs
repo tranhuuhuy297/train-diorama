@@ -25,9 +25,8 @@ const xyz = vector => [vector.x, vector.y, vector.z];
 const sameBits = (actual, expected, label) => actual.forEach((value, at) => assert.ok(Object.is(value, expected[at]), `${label}[${at}]: ${value} vs ${expected[at]}`));
 const layersOf = world => world.group.children.slice(-3);
 
-// Station traveler figures arrive in a later build stage; everything else must match.
-function assertSameSignature(originalRoot, cloneRoot, label, { ordered = false, exclude = new Set() } = {}) {
-  const comparison = compareSceneSignatures(sceneGraphSignature(originalRoot, { exclude }), sceneGraphSignature(cloneRoot), { ordered });
+function assertSameSignature(originalRoot, cloneRoot, label, { ordered = false } = {}) {
+  const comparison = compareSceneSignatures(sceneGraphSignature(originalRoot), sceneGraphSignature(cloneRoot), { ordered });
   assert.ok(comparison.equal, `${label}: ${comparison.report}`);
 }
 
@@ -108,9 +107,8 @@ describe('sheep flock build parity with the original', { skip, timeout: 300_000 
       assertSameSignature(layer, twin, `layer ${index}`);
     });
     assert.deepEqual(clone.sheepLegs.instanceMatrix.count, 108);
-    const exclude = new Set(original.stationTravelers.map(traveler => traveler.figure));
-    assertSameSignature(original.group, clone.group, 'world.group', { exclude });
-    assertSameSignature(original.group, clone.group, 'world.group order', { exclude, ordered: true });
+    assertSameSignature(original.group, clone.group, 'world.group');
+    assertSameSignature(original.group, clone.group, 'world.group order', { ordered: true });
   });
 
   test('(A8) pasture sheep near a clearing (null-height sink candidates)', t => {

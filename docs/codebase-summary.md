@@ -1,12 +1,13 @@
 # Codebase summary
 
-Tree reflects the repository through phase 9 (scaffold/shell/HUD, core noise/materials/
+Tree reflects the repository through phase 13 (scaffold/shell/HUD, core noise/materials/
 effects/geometry, the real engine: renderer, frame loop, palettes, sky, shadow/post, pixel
 art, overview camera; then the debug menu, the parity hook and the node + browser parity harness;
 then the world core: build-step registry, terrain, track and bridge; then the Mossbrook station,
 its wall clock and the world per-frame orchestrator; then the train; then the village cottages,
 chimney smoke, shrubs and the windmill; then the village residents, the forest with its canopy
-height grid and the riverside rocks; then the water, the cloud field and the hot-air balloon). Later phases append rows; they do not rewrite earlier phases' sections.
+height grid and the riverside rocks; then the water, the cloud field and the hot-air balloon; then the
+station travelers, the bird perches and the bird flocks). Later phases append rows; they do not rewrite earlier phases' sections.
 
 ```
 train-diorama/
@@ -36,10 +37,10 @@ train-diorama/
 │   │   ├── loading-screen-step-runner.js        runLoadingSteps, LOADING_HINTS
 │   │   └── debug-menu-panel.js                  mountDebugMenu (Trees/Clouds toggles), formatPerformanceText
 │   ├── engine/
-│   │   ├── diorama.js                           Diorama facade: real engine, ctor order, UI API, updateTrain, puffTimer accessors, dispose
-│   │   ├── diorama-scene-composition.js         composeDioramaScene: world, train, sparks, motion init, sky, puffs, shadow-hidden list, glow registry
+│   │   ├── diorama.js                           Diorama facade: real engine, ctor order, UI API, updateTrain, puffTimer accessors, dispose (birds before sparks)
+│   │   ├── diorama-scene-composition.js         createWorldBirdSystem; composeDioramaScene: world, birds, free pose, train, sparks, motion init, sky, puffs, shadow-hidden list, glow registry
 │   │   ├── frame-loop-scheduler.js              120fps deadline loop, per-frame order (world.nightAmount), perf EMA
-│   │   ├── simulation-step.js                   stepSimulation: time/uTime, updateTrain, world.update(time, simDt, loco position, motion) (birds later)
+│   │   ├── simulation-step.js                   stepSimulation: time/uTime, updateTrain, world.update(time, simDt, loco position, motion), birds.update
 │   │   ├── time-of-day-palettes-and-transition.js PALETTES (3x12), applyPalette, begin/stepPaletteTransition
 │   │   ├── night-light-glow-registry.js         collectNightLightGlows, applyNightGlowVisibility
 │   │   ├── custom-shadow-depth-pass.js          2048^2 depth RT, ortho light cam, bias matrix
@@ -77,6 +78,19 @@ train-diorama/
 │   │   ├── extrude-profile-along-frames.js       extrude(frames, profile, caps)
 │   │   └── building-wall-and-roof-vents.js       addWallVent, addRoofVent
 │   ├── life/
+│   │   ├── birds/
+│   │   │   ├── bird-geometry-builder.js                 createBirdGeometries (merged tinted body + wing/tip/tail), createBirdRig (12 objects), disposeBirdGeometries
+│   │   │   ├── bird-flock-state-machine.js              decideBirdFlock (perched/flying/returning, [BIRDS] logs), computeFlockSnapshot (scratch target); no three
+│   │   │   ├── bird-flight-poses.js                     createBirdFlightPoses: perched (idle + folded wings), flying (orbit), returning (glide + hop)
+│   │   │   ├── bird-wing-body-animator.js               rotateBirdTowards (capped slerp), orientBirdAlongFlight (pitch/bank), animateBirdWingsAndBody
+│   │   │   └── bird-system.js                           createBirdSystem: mulberry32(7821) flocks, flight heights, init snap, update, dispose
+│   │   ├── station/
+│   │   │   ├── station-figure-parts.js                  attachMesh(geometry, material, parent, position, scale?)
+│   │   │   ├── station-traveler-old-man-figure.js       buildStationTravelerOldMan: IK legs, arm pivots, cane, hat, body regroup, 5 merges
+│   │   │   ├── station-walker-controller.js             StationWalker (wait/turn/step, [STATION] logs), createPlatformWalker (widening float ops)
+│   │   │   ├── station-walker-leg-ik-and-body-animation.js poseWalkerLegs (2-bone IK), animateWalkerBody (bob/sway/arms/cane floor solve)
+│   │   │   ├── station-grandmother-figure.js            buildStationGrandmother: skirt, shawl, spectacles, bun, handbag, 2 merges, shift
+│   │   │   └── station-travelers-idle-and-head-look.js  updateStationTravelers (slot 7): idle sway for non-walkers, faded head-look
 │   │   ├── sheep/
 │   │   │   ├── sheep-geometry-and-instanced-meshes.js   SHEEP_CAPACITY 27, SHEEP_LEGS, SHEEP_EARS, createSheepInstancedMeshes (body/leg/ear layers)
 │   │   │   ├── sheep-pasture-ground-query.js            sheepGroundAt(world, x, z, normalOut): pasture mask + slope normal
@@ -108,8 +122,8 @@ train-diorama/
 │   └── world/
 │       ├── world.js                              class World: field init, rand = mulberry32(42), build steps, queries, treeCanopyHeightAt
 │       ├── world-constants.js                    SIZE, HALF, SEG, STEP, BOTTOM, UP, RIGHT, POND, RIVER, track points
-│       ├── world-build-steps.js                  WORLD_BUILD_STEPS registry (writable entries) + runWorldBuildSteps; createVillageResidents (yards r2.2), buildRocksAndSheep, buildWater/Clouds/Balloon
-│       ├── world-per-frame-update.js             updateWorld: fixed slot order (1 clock, 2–3 sheep, 5–6 residents + log, 8 smoke, 9 rotor, 10 clouds, 11 balloon)
+│       ├── world-build-steps.js                  WORLD_BUILD_STEPS registry (writable entries) + runWorldBuildSteps; createVillageResidents (yards r2.2), buildRocksAndSheep, buildWater/Clouds/Balloon, buildBirdPerches (16)
+│       ├── world-per-frame-update.js             updateWorld: fixed slot order (1 clock, 2–3 sheep, 4 walker, 5–6 residents + logs, 7 travelers, 8 smoke, 9 rotor, 10 clouds, 11 balloon)
 │       ├── terrain/
 │       │   ├── river-distance-and-natural-height.js           segDist, riverDist, naturalHeight
 │       │   ├── terrain-heightmap-grading.js                   buildHeightmap, nearest-track grid cache, heightAt
@@ -124,7 +138,7 @@ train-diorama/
 │       │   ├── bridge-deck-girders-and-railings.js            buildBridge: deck, girders, handrails, 76 posts
 │       │   └── bridge-arch-columns-piers-abutments.js         createBridgeChord, arch ribs, columns, braces, piers, abutments
 │       ├── station/
-│       │   ├── build-station.js                               buildStation: fixed call order, traveler/grandmother slots
+│       │   ├── build-station.js                               buildStation: fixed call order, traveler + walker after the sign, grandmother between the luggage builders
 │       │   ├── station-site-placement.js                      frame 1008, stationS, group, freeCameraStart, shiftedX, r8 exclusion
 │       │   ├── station-palette-materials.js                   npr option tables, createStationMaterials, case colours
 │       │   ├── station-platform-shelter-bench.js              slab, edge line, shelter, bench
@@ -149,6 +163,8 @@ train-diorama/
 │       │   └── tree-canopy-height-grid.js                     70×70 Float32 grid: stampCanopyHeights, treeCanopyHeightAt
 │       ├── rocks/
 │       │   └── riverside-rock-scatter.js                      buildRiversideRocks: ≤ 80 instanced dodecahedra (W5a draws)
+│       ├── perches/
+│       │   └── bird-perch-builders.js                         buildBirdPerches (step 16): bridge-1..3, station-roof, trackside-2..4
 │       ├── water/
 │       │   └── river-water-and-waterfall-builder.js           findWaterfallMouth, createWaterfallGeometry (8×24), buildWater (step 13)
 │       ├── sky/
@@ -173,7 +189,10 @@ train-diorama/
 │       ├── page-shot-actions.mjs                shot page actions: uniformTimeOffset, debugLayerOff, inPageCameraPose (named), holdPausedFrames
 │       ├── page-hide-set-application.mjs        in-page hide sets incl. allButWorldCore, the station-era families, unbuiltAfterWindmill, water
 │       ├── dom-shot-page-helpers.mjs            capture CSS, DOM actions (reshowLoader), settle, clip
-│       ├── parity-shot-list.mjs                 stages, thresholds, hide sets/presets, shots, validation (relations, in-page poses)
+│       ├── parity-shot-list.mjs                 shots and selection; re-exports stages/hide sets and validation
+│       ├── parity-shot-stages-and-hide-sets.mjs  PARITY_STAGES, ACTIVE_PARITY_STAGE (full-scene), THRESHOLDS, HIDE_SETS, HIDE_PRESETS, expandHideSets
+│       ├── parity-shot-validation.mjs           shotListErrors: enums, hide sets, transients, references, regions, poses, relations
+│       ├── station-travelers-and-birds-parity-shots.mjs travelers close-up, roof take-off, bridge birds in flight (full-scene)
 │       ├── research-capture-paths.mjs           research-dir resolver, capture paths, skip reason
 │       ├── parity-shot-factory-and-camera-poses.mjs shot() record factory + defaults, home/zoomed/chase/bridge poses
 │       ├── camera-mode-parity-shots.mjs         camera-mode shots (side/bridge/orbit), strict + relaxed twins
@@ -184,7 +203,9 @@ train-diorama/
 │       ├── capture-parity-shots.mjs             CLI parity:capture (sessions, PNG + meta incl. regions), prepareShotScene
 │       ├── compare-parity-shots.mjs             CLI parity:compare (metrics, per-region crops, heatmaps, meta warnings, report)
 │       ├── intra-site-shot-checks.mjs           same-site relations (differs/identical) and shot-action result checks
-│       ├── runtime-counts-probe.mjs             CLI parity:probe (renderer.info, world fields, village, station, sheep, water/clouds/balloon, diff; --shot, --fields)
+│       ├── runtime-counts-probe.mjs             CLI parity:probe (renderer.info, world fields, scenario sections, station, sheep, diff; --shot, --fields)
+│       ├── scenario-probe-sections.mjs          collect + judge per-scenario sections (village, forest, water/clouds/balloon, travelers/birds)
+│       ├── station-travelers-and-birds-runtime-probe.mjs flocks, birds, perch ids, flock modes, travelers, walker pose + comparison rules
 │       ├── village-windmill-runtime-probe.mjs   exact village/windmill probe fields (homes, windmill transform, rotor, smoke)
 │       ├── forest-residents-runtime-probe.mjs   tree/rock/resident counts, exclusion count + expected sheep-clearing delta
 │       ├── sheep-flock-runtime-probe.mjs        sheep section: layer counts, routes, first pasture spots, stranding candidates, hop frames K1..K3
@@ -206,8 +227,9 @@ train-diorama/
 │   │   ├── scene-graph-signature.mjs            DFS signatures, multiset/ordered compare
 │   │   ├── scene-signature-key-builders.mjs     material/geometry/instance/texture keys
 │   │   ├── clone-world-factory.mjs              createCloneWorld(options), WORLD_CORE_SKIP (CM off + DOM shim first)
-│   │   ├── clone-simulation-driver.mjs          createCloneSimulation (oracle ctx shape, freeCameraPose), setCloneMode, stepCloneFrame, snapshotTrainState
-│   │   ├── sheep-flock-parity-lockstep.mjs      firstSheepFlockMismatch (in-place, Object.is), runSheepLockstep (per-side Math.random + [SHEEP] logs)
+│   │   ├── clone-simulation-driver.mjs          createCloneSimulation (oracle ctx shape, birds, freeCameraPose), setCloneMode, stepCloneFrame, snapshotTrainState, snapshotLifeState
+│   │   ├── sheep-flock-parity-lockstep.mjs      firstSheepFlockMismatch (in-place, Object.is), runSheepLockstep (per-side Math.random + logs by prefix)
+│   │   ├── station-travelers-and-birds-first-build.mjs first clone/original builds with draws counted (buildStation, bird material, birds), walker/rig/flock readers
 │   │   ├── counted-full-world-builds.mjs        full original/clone builds with Math.random draws counted per named build step
 │   │   ├── smoke-puff-behaviour-checks.mjs      trackPuffs + assertPuffBehaviour: spec-formula smoke gaps, lifetimes, steady state
 │   │   └── fresh-process-train-material-ids.mjs Train material id rows from a child process (cold npr cache)
@@ -222,7 +244,7 @@ train-diorama/
 │   │   ├── merge-static-geometry-and-glows.test.mjs     synthetic rig merge + cone/glow parity
 │   │   ├── time-of-day-transition.test.mjs              palettes, transition maths, sky material, glow registry
 │   │   ├── frame-cadence-and-render-resolution.test.mjs deadline cadence, loop order (nightAmount write), instance-override dispatch
-│   │   ├── diorama-scene-composition-order.test.mjs     world, train, sparks, sky, puffs; shadow list; train glows last; departure state
+│   │   ├── diorama-scene-composition-order.test.mjs     world, birds, train, sparks, sky, puffs; shadow list; train glows last; departure state
 │   │   ├── train-station-motion-controller.test.mjs     motion: cruise, justLeft window, √ profile, snap, dwell, laps, strength, smoke interval
 │   │   ├── shadow-post-and-render-pipeline-passes.test.mjs post uniforms, shadow pass, render pipeline order + headlight uniforms
 │   │   ├── overview-intro-and-camera-modes.test.mjs     controls config, intro easing/logs, double reset, modes
@@ -240,11 +262,13 @@ train-diorama/
 │   │   ├── village-and-windmill-build-logic.test.mjs     shutter cycle, smoke formula, rotor, shrubs, village guard, site search, windmill structure
 │   │   ├── parity-village-windmill-shots-regions-and-probe.test.mjs village shots, unbuiltAfterWindmill, regions + crops, probe section
 │   │   ├── village-walk-cycle-and-tree-rock-scatter.test.mjs walk-cycle table, canopy grid edges, W4/W5a draw accounting (stub worlds)
-│   │   ├── parity-forest-residents-shots-actions-and-probe.test.mjs forest shots, water/cloneMissing, page actions, forest probe, relations
+│   │   ├── parity-forest-residents-shots-actions-and-probe.test.mjs forest shots, water/figure hide sets, page actions, forest probe, relations
 │   │   ├── track-sheep-escape-state-machine.test.mjs   FSM windows, reaction delay, same-step jump, escape/return, flock loop, fuzz vs original
 │   │   ├── parity-sheep-shots-and-probe.test.mjs        sheep shots, close-up pose, probe section and comparison rules
 │   │   ├── waterfall-cloud-avoidance-and-balloon-flight.test.mjs mouth + curtain grid, drift/fade, camera push, flight formulas, envelope checker, water materials
-│   │   └── parity-water-clouds-balloon-shots-and-probe.test.mjs water/cloud/balloon shots, waterfall region, probe section and rules
+│   │   ├── parity-water-clouds-balloon-shots-and-probe.test.mjs water/cloud/balloon shots, waterfall region, probe section and rules
+│   │   ├── bird-flock-state-machine.test.mjs            transition table + boundaries, capture flags, snapshot thresholds, wrap, x/z cars, scratch target
+│   │   └── parity-station-travelers-and-birds-shots-and-probe.test.mjs travelers/birds shots and poses, probe section, verdicts
 │   └── parity/
 │       ├── harness-self-check.test.mjs                  cache-gated original World/stepper/oracle checks (npm run test:parity)
 │       ├── terrain-track-bridge-parity.test.mjs         world core vs original: bytes, queries, signatures (multiset + ordered), material request order, draws, build time
@@ -256,7 +280,9 @@ train-diorama/
 │       ├── camera-modes-parity.test.mjs                 11 708 frames vs the oracle: side sweep, train rig, bridge, free flight clamps, pose save/restore
 │       ├── sheep-flock-parity.test.mjs                  build after step 12 (stream, ground sweep, states, clearing, exclusions, layers, world.group) + 60 s synthetic train
 │       ├── sheep-flock-oracle-train-parity.test.mjs     oracle train lockstep: 260 s day/night/wake, 90 s at speedMul 2.5, 60 s of 0.1 s steps
-│       └── water-clouds-balloon-parity.test.mjs         cold-cache full builds: UUID draws per step, fingerprint, 33 clouds, signatures, materials, 300 s lockstep
+│       ├── water-clouds-balloon-parity.test.mjs         cold-cache full builds: UUID draws per step, fingerprint, 33 clouds, signatures, materials, 300 s lockstep
+│       ├── station-travelers-and-birds-parity.test.mjs  first-build draws, perches, flock init, lane floats, walker events, oracle lockstep (180 s + 60 s at dt 0.1)
+│       └── fixtures/station-travelers-and-birds-expected.json perch, flock, walker and [BIRDS] timeline fixtures
 └── docs/                                        this file, the other skeleton docs, parity-testing-guide.md
 ```
 
@@ -276,4 +302,5 @@ train-diorama/
 | P10 | Camera modes: free fly (pointer lock), train fly-along rig, bridge tripod | Complete (headed pointer-lock check pending) |
 | P11 | Sheep flock: pasture sheep, trackside clearing, rail-sheep escape state machine (build step 12, update slots 2–3) | Complete |
 | P12 | Water + waterfall shaders, 33-cloud field with camera avoidance, hot-air balloon (build steps 13–15, update slots 10–11, frame step 7) | Complete |
-| P13–P14 | Station travellers/birds, ship | Pending (see `development-roadmap.md`) |
+| P13 | Station travellers (walker IK, grandmother, head-look), bird perches (build step 16), bird flocks (update slots 4, 6, 7; birds after the world) | Complete |
+| P14 | Full-scene parity signature, ship | Pending (see `development-roadmap.md`) |

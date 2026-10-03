@@ -29,7 +29,7 @@ describe('sheep shots', () => {
       const shot = byId(id);
       assert.deepEqual([shot.stage, shot.timeOfDay, Math.round(shot.seconds * 60), shot.thresholdClass, shot.fresh, shot.reportOnly],
         ['residents-and-forest', timeOfDay, frames, 'deterministic', true, false], id);
-      assert.deepEqual(expandHideSets(shot.hide), ['birds', 'stationFigures', 'puffs', 'sparks']);
+      assert.deepEqual(expandHideSets(shot.hide), ['puffs', 'sparks']);
       assert.equal(shot.inPageCameraPose, 'sheepFlockCloseup');
     }
   });

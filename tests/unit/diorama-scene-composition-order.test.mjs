@@ -1,4 +1,4 @@
-// Scene composition order: world, train, sparks, sky, then the 70 puffs (insertion order sets UUID,
+// Scene composition order: world, bird flocks, train, sparks, sky, then the 70 puffs (insertion order sets UUID,
 // material.id and glow order), the shadow-hidden list, the train glows at the end of the glow registry,
 // and the departure state set before the sky.
 import '../../src/core/disable-three-color-management.js';
@@ -10,13 +10,19 @@ import { composeDioramaScene } from '../../src/engine/diorama-scene-composition.
 
 installMinimalDomShim();
 
-test('composeDioramaScene inserts world, train, sparks, sky and puffs in order with the matching shadow list', () => {
+test('composeDioramaScene inserts world, birds, train, sparks, sky and puffs in order with the matching shadow list', () => {
   const d = { scene: new THREE.Scene() };
   composeDioramaScene(d);
   const puffMeshes = d.puffs.map(puff => puff.mesh);
   assert.equal(d.puffs, d.puffPool.puffs, 'the parity surface exposes the pool records themselves');
   assert.equal(puffMeshes.length, 70);
-  assert.deepEqual(d.scene.children, [d.world.group, d.train.group, d.brakeSparks.mesh, d.sky, ...puffMeshes]);
+  // Identity checks: a failing deepEqual over whole scene graphs would exhaust memory while diffing.
+  const expectedChildren = [d.world.group, d.birds.group, d.train.group, d.brakeSparks.mesh, d.sky, ...puffMeshes];
+  assert.equal(d.scene.children.length, expectedChildren.length);
+  assert.ok(d.scene.children.every((child, index) => child === expectedChildren[index]), 'scene child order');
+  assert.equal(d.birds.group.name, 'Bird flocks');
+  assert.equal(d.birds.flocks.length, 7);
+  assert.ok(!d.shadowHiddenObjects.includes(d.birds.group), 'birds cast shadows');
   assert.ok(puffMeshes.every(mesh => !mesh.visible && mesh.geometry === puffMeshes[0].geometry && mesh.material === puffMeshes[0].material));
 
   const expectedShadowList = [d.sky, d.brakeSparks.mesh, ...d.world.noShadow, ...d.train.noShadow, ...puffMeshes];

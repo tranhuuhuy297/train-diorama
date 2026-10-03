@@ -1,5 +1,53 @@
 # Project changelog
 
+## [0.13.0] - 2026-10-03
+
+feat(life): station travelers (walking old man with cane, waiting grandmother) and bird flocks on perches.
+
+### Added
+
+- `src/world/perches/bird-perch-builders.js`: `buildBirdPerches` (build step 16) produces every
+  perch: `bridge-1..3`, `station-roof` (widening applied after `localToWorld`), `trackside-2..4`
+  (trackside-1 never finds a spot); 7 records, bit-identical to the original's.
+- `src/life/station/`: `buildStationTravelerOldMan` (IK leg meshes, shoulder-pivoted arms, cane,
+  hat, body regroup, 5 merges; returns the shared `shoulderGeometry`), `StationWalker` /
+  `createPlatformWalker` (wait, turn on the spot, 0.7 s steps; `[STATION] Traveler walks|arrives:
+  stop N`; platform widening by the float operation sequence → lane x 0.20999999999999985),
+  `poseWalkerLegs` / `animateWalkerBody` (2-bone IK, bob/sway/arm swing, cane floor solve),
+  `buildStationGrandmother` (x −0.5300000000000002), `updateStationTravelers` (idle sway for
+  non-walkers, faded head-look), `attachMesh`.
+- `src/life/birds/`: `createBirdGeometries` / `createBirdRig`, `decideBirdFlock` /
+  `computeFlockSnapshot`, `createBirdFlightPoses`, `rotateBirdTowards` / `orientBirdAlongFlight` /
+  `animateBirdWingsAndBody`, `createBirdSystem` (mulberry32(7821), 7 flocks, 18 birds, `[BIRDS]`
+  logs).
+- Tests: `tests/unit/bird-flock-state-machine.test.mjs`,
+  `tests/unit/parity-station-travelers-and-birds-shots-and-probe.test.mjs`,
+  `tests/parity/station-travelers-and-birds-parity.test.mjs` with
+  `tests/parity/fixtures/station-travelers-and-birds-expected.json` and helper
+  `tests/helpers/station-travelers-and-birds-first-build.mjs` (first-build draws 2532 / 4 / 948,
+  oracle lockstep 180 s + 60 s at dt 0.1).
+- Parity tooling: `station-travelers-and-birds-parity-shots.mjs` (3 full-scene shots),
+  `station-travelers-and-birds-runtime-probe.mjs` (probe field `stationTravelersAndBirds`),
+  `scenario-probe-sections.mjs`, `parity-shot-stages-and-hide-sets.mjs`, `parity-shot-validation.mjs`.
+
+### Changed
+
+- `build-station.js`: traveler + walker + `stationTravelers[0]` after the sign, grandmother +
+  `stationTravelers[1]` between the traveler suitcases and the stack.
+- `world-build-steps.js`: step 16 `buildBirdPerches`. `world-per-frame-update.js`: slot 4
+  (`stationWalker.update`), slot 6 logs the resident line then the traveler line, slot 7
+  (`updateStationTravelers`).
+- `diorama-scene-composition.js`: `createWorldBirdSystem(world)`; birds added right after the
+  world, before the free-camera pose. `simulation-step.js`: `birds.update` after the world.
+  `diorama.js`: `birds.dispose()` after `controls.dispose()`.
+- `tests/helpers/clone-simulation-driver.mjs`: birds + `snapshotLifeState`;
+  `sheep-flock-parity-lockstep.mjs`: `logPrefixes`. Earlier parity suites compare `world.group`
+  including the station figures; the composition tests expect the bird group after the world.
+- Parity tooling: `parity-shot-list.mjs` split (stages/hide sets and validation in their own
+  modules, re-exported); `cloneMissing` preset retired; `ACTIVE_PARITY_STAGE` = `full-scene`;
+  `runtime-counts-probe.mjs` judges scenario sections through `scenario-probe-sections.mjs`.
+  The clone's frozen default now equals the original: 1373 / 1,762,696 / 419 / 6 / 25.
+
 ## [0.12.0] - 2026-10-03
 
 feat(world): pond/river water, waterfall, drifting cloud field with camera avoidance, hot-air balloon.

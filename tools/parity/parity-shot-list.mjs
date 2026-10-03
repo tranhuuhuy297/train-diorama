@@ -1,39 +1,20 @@
-// Stage-gated browser parity shots, thresholds and hide sets, plus the single resolver for the research
-// captures that live outside the repo (reference PNGs and capture logs).
+// Stage-gated browser parity shots and their selection, plus the single resolver for the research
+// captures that live outside the repo; stages, thresholds and hide sets are re-exported for the tools.
 import { existsSync } from 'node:fs';
 import { PALETTES } from '../../src/engine/time-of-day-palettes-and-transition.js';
 import { shot, ZOOMED, ZOOMED_ORBITED, LOCO_CHASE, BRIDGE_VIEW, lookFromTarget, locoView } from './parity-shot-factory-and-camera-poses.mjs';
-import { REGION_NAMES } from './shot-region-projection.mjs';
-import { IN_PAGE_CAMERA_POSES } from './page-shot-actions.mjs';
+import { PARITY_STAGES, ACTIVE_PARITY_STAGE } from './parity-shot-stages-and-hide-sets.mjs';
+import { shotListErrors } from './parity-shot-validation.mjs';
 import { cameraModeShots } from './camera-mode-parity-shots.mjs';
 import { sheepFlockShots } from './sheep-flock-parity-shots.mjs';
 import { waterCloudsBalloonShots } from './water-clouds-balloon-parity-shots.mjs';
+import { stationTravelersAndBirdsShots } from './station-travelers-and-birds-parity-shots.mjs';
 import { resolveResearchDir, researchCapturePath } from './research-capture-paths.mjs';
 
 export { resolveResearchDir, researchCapturePath, researchSkipReason } from './research-capture-paths.mjs';
-
-export const PARITY_STAGES = Object.freeze(['shell-and-sky', 'train', 'village-and-windmill', 'residents-and-forest', 'full-scene']);
-export const ACTIVE_PARITY_STAGE = 'residents-and-forest';
-export const CHANNEL_DIFF_THRESHOLD = 16;
-
-export const THRESHOLDS = Object.freeze({
-  deterministic: Object.freeze({ meanAbsDiff: 1.0, overThresholdFraction: 0.005 }),
-  transient: Object.freeze({ meanAbsDiff: 3.0, overThresholdFraction: 0.03 }),
-  dom: Object.freeze({ meanAbsDiff: 0.5, overThresholdFraction: 0.002 }),
-});
-
-// allButWorldCore keeps only the sky and terrain/track/bridge meshes (selected by material in the page).
-export const HIDE_SETS = Object.freeze(['world', 'train', 'birds', 'puffs', 'sparks', 'clouds', 'trees', 'allButWorldCore',
-  'stationFigures', 'sheep', 'balloon', 'villageResidents', 'houseSmoke', 'unbuiltAfterWindmill', 'water']);
-// Everything that moves or that other build steps add around the station, plus the transients.
-const MOVING_FAMILIES = ['stationFigures', 'train', 'birds', 'trees', 'sheep', 'clouds', 'balloon', 'villageResidents', 'houseSmoke'];
-export const HIDE_PRESETS = Object.freeze({
-  skyOnly: Object.freeze(['world', 'train', 'birds', 'puffs', 'sparks']),
-  transient: Object.freeze(['puffs', 'sparks']),
-  allFamilies: Object.freeze([...MOVING_FAMILIES, 'puffs', 'sparks']),
-  // Systems later build steps add (the clone does not have them yet), hidden alike on both sites.
-  cloneMissing: Object.freeze(['birds', 'stationFigures']),
-});
+export {
+  PARITY_STAGES, ACTIVE_PARITY_STAGE, CHANNEL_DIFF_THRESHOLD, THRESHOLDS, HIDE_SETS, HIDE_PRESETS, expandHideSets,
+} from './parity-shot-stages-and-hide-sets.mjs';
 
 export function findMissingReferences(shots = PARITY_SHOTS, researchDir = resolveResearchDir()) {
   return shots
@@ -57,12 +38,12 @@ const TRAIN_ONLY = ['world', 'birds'];
 const BRAKING_FRONT = { seconds: 36, camera: locoView([4.5, 2.6, 6.5], [0, 1.2, 0.5]) };
 // Village and windmill vs an original with every later build step hidden; judged inside both regions.
 const VILLAGE_VIEW = { seconds: 3, hide: ['unbuiltAfterWindmill', 'transient'], regions: ['village', 'windmill'] };
-// Residents, forest and rocks: the full scene with the not-yet-built systems masked on both sites.
-const MASKED = { seconds: 3, hide: ['cloneMissing', 'transient'] };
+// Residents, forest and rocks over the full scene (ids keep their historical -masked suffix).
+const MASKED = { seconds: 3, hide: ['transient'] };
 // Fresh page each, so the t0 baseline never inherits a parked train from a shared session.
 const SWAY = { hide: MASKED.hide, camera: ZOOMED_ORBITED, uniformTimeOffset: 5, fresh: true };
-// Free-camera start over the station, train parked away; strict once the trees stand on the clone.
-const STATION_FREE_START = { camera: { relativeTo: 'freeCameraStart', fov: 65 }, hide: ['cloneMissing', 'train', 'transient'], parkTrain: true };
+// Free-camera start over the station, train parked away.
+const STATION_FREE_START = { camera: { relativeTo: 'freeCameraStart', fov: 65 }, hide: ['train', 'transient'], parkTrain: true };
 
 export const PARITY_SHOTS = Object.freeze([
   shot('sky-day', SHELL, '3d', '14-overview-day-settled.png', SKY),
@@ -128,11 +109,8 @@ export const PARITY_SHOTS = Object.freeze([
   shot('bridge-cam-day', FULL, '3d', '06b-bridge-camera-later.png', { ...MOVING, mode: 'bridge' }),
   shot('bridge-cam-evening', FULL, '3d', '19-evening-bridge-camera.png', { ...MOVING, mode: 'bridge', timeOfDay: 'evening' }),
   shot('mobile-overview', FULL, '3d', '13-mobile-overview.png', { ...SETTLED, viewport: 'mobile' }),
+  ...stationTravelersAndBirdsShots(FULL),
 ]);
-
-export function expandHideSets(hide) {
-  return [...new Set(hide.flatMap(name => HIDE_PRESETS[name] ?? [name]))];
-}
 
 export function selectShots({ ids = null, stage = ACTIVE_PARITY_STAGE } = {}) {
   if (ids && ids.length > 0) {
@@ -148,52 +126,6 @@ export function selectShots({ ids = null, stage = ACTIVE_PARITY_STAGE } = {}) {
   return PARITY_SHOTS.filter(candidate => !candidate.reportOnly && PARITY_STAGES.indexOf(candidate.stage) <= limit);
 }
 
-const ALLOWED = {
-  kind: ['3d', 'dom'], viewport: ['desktop', 'mobile'], mode: ['overview', 'orbit', 'side', 'bridge'],
-  timeOfDay: ['day', 'evening', 'night'], pixelShortSide: [null, 720, 540, 360], thresholdClass: Object.keys(THRESHOLDS),
-  stage: PARITY_STAGES,
-};
-const REFERENCE_NAME = /^\d{2}[a-z]?-[a-z0-9-]+\.png$/;
-const TRANSIENT_LIFETIME_SECONDS = 3.6;
-
-function shotErrors(candidate) {
-  const errors = [];
-  for (const [field, allowed] of Object.entries(ALLOWED)) {
-    if (!allowed.includes(candidate[field])) errors.push(`${candidate.id}: unknown ${field} ${candidate[field]}`);
-  }
-  for (const name of candidate.hide) {
-    if (!HIDE_SETS.includes(name) && !Object.hasOwn(HIDE_PRESETS, name)) errors.push(`${candidate.id}: unknown hide set ${name}`);
-  }
-  if (candidate.kind === 'dom' && !(candidate.selectors?.length > 0)) errors.push(`${candidate.id}: dom shot without selectors`);
-  for (const name of candidate.regions) if (!REGION_NAMES.includes(name)) errors.push(`${candidate.id}: unknown region ${name}`);
-  const hidden = expandHideSets(candidate.hide);
-  const transientsHidden = hidden.includes('allButWorldCore') || (hidden.includes('puffs') && hidden.includes('sparks'));
-  const transientsVisible = !transientsHidden;
-  if (candidate.kind === '3d' && transientsVisible && !(candidate.seconds > TRANSIENT_LIFETIME_SECONDS)) {
-    errors.push(`${candidate.id}: transients visible but only ${candidate.seconds} s stepped`);
-  }
-  if (candidate.reference !== null && !REFERENCE_NAME.test(candidate.reference)) errors.push(`${candidate.id}: bad reference ${candidate.reference}`);
-  if (candidate.inPageCameraPose && !IN_PAGE_CAMERA_POSES.includes(candidate.inPageCameraPose)) errors.push(`${candidate.id}: unknown in-page pose ${candidate.inPageCameraPose}`);
-  return errors;
-}
-
-// Same-site relations: `to` must be another listed shot and `expect` 'differs' (with a pixel floor) or 'identical'.
-function relationErrors(candidate, ids) {
-  const { relation } = candidate;
-  if (!relation) return [];
-  const known = ids.has(relation.to) && relation.to !== candidate.id;
-  const shape = relation.expect === 'identical' || (relation.expect === 'differs' && relation.minOverFraction > 0);
-  return known && shape ? [] : [`${candidate.id}: bad relation ${JSON.stringify(relation)}`];
-}
-
 export function validateShotList(shots = PARITY_SHOTS) {
-  const errors = [];
-  const seen = new Set();
-  for (const candidate of shots) {
-    if (seen.has(candidate.id)) errors.push(`${candidate.id}: duplicate id`);
-    seen.add(candidate.id);
-    errors.push(...shotErrors(candidate));
-  }
-  for (const candidate of shots) errors.push(...relationErrors(candidate, seen));
-  return errors;
+  return shotListErrors(shots);
 }

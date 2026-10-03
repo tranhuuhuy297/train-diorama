@@ -1,11 +1,11 @@
 // Sheep shots: a close view across the rail sheep from beside the track (in-page pose built from route 2 on
 // each site; the probe proves the routes equal), by day, asleep at night, and around sheep 2's first hop.
-// Transients and the systems the clone still lacks are hidden on both sites.
+// Transients are hidden on both sites.
 import { shot } from './parity-shot-factory-and-camera-poses.mjs';
 
 // First frame sheep 2 enters 'escaping' after the default preamble (probe value K2, equal on both sites).
 export const SHEEP_HOP_K2 = 824;
-const SHEEP_VIEW = { inPageCameraPose: 'sheepFlockCloseup', hide: ['cloneMissing', 'transient'] };
+const SHEEP_VIEW = { inPageCameraPose: 'sheepFlockCloseup', hide: ['transient'] };
 
 // [id, time of day, frames stepped at 1/60 s, reference capture]
 const SHEEP_SHOT_ROWS = Object.freeze([

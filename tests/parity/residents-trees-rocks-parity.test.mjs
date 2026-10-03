@@ -169,9 +169,8 @@ describe('residents, trees and rocks parity with the original', { skip, timeout:
       [expected.material.uniforms.uStipple.value, expected.material.uniforms.uStippleScale.value, expected.material.vertexColors]);
     assert.equal(actual.material, npr({ vertexColors: true, stipple: 0.3, stippleScale: 3 }), 'rock material cache key');
     assert.deepStrictEqual([actual.instanceColor, expected.instanceColor], [null, null]);
-    const exclude = new Set(original.stationTravelers.map(traveler => traveler.figure));
-    assertSameSignature(original.group, clone.group, 'world.group', { exclude, cloneSignature: groupSignature });
-    assertSameSignature(original.group, clone.group, 'world.group order', { exclude, ordered: true, cloneSignature: groupSignature });
+    assertSameSignature(original.group, clone.group, 'world.group', { cloneSignature: groupSignature });
+    assertSameSignature(original.group, clone.group, 'world.group order', { ordered: true, cloneSignature: groupSignature });
     assert.deepStrictEqual(clone.exclusions, original.exclusions);
   });
 });

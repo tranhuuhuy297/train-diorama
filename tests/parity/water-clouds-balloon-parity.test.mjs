@@ -19,7 +19,6 @@ const INSTANCE_COUNTS = [15, 12, 14, 12, 12, 16, 14, 14, 14, 15, 13, 16, 16, 15,
 const HOME = [-55.522, 62.771, 130.519];
 
 const xyz = vector => [vector.x, vector.y, vector.z];
-const figuresOf = world => new Set((world.stationTravelers ?? []).map(traveler => traveler.figure));
 const waterOf = world => world.group.children.find(child => child.isMesh && child.material?.uniforms?.uHeight);
 const waterfallOf = world => world.group.children[world.group.children.indexOf(waterOf(world)) + 1];
 
@@ -104,10 +103,10 @@ describe('water, clouds and balloon parity with the original', { skip, timeout: 
     assert.ok(!('uSaturation' in water.uniforms));
   });
 
-  test('(4) the whole world group, minus the original station traveler figures', () => {
+  test('(4) the whole world group, station travelers included', () => {
     const [original, clone] = [sides.original.world, sides.clone.world];
     assert.equal(clone.group.children.length, original.group.children.length);
-    assertSameSignature(original.group, clone.group, 'world.group', figuresOf(original));
+    assertSameSignature(original.group, clone.group, 'world.group');
   });
 
   test('(5) water and waterfall material structure', () => {

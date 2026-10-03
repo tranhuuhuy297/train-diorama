@@ -33,7 +33,7 @@ after(() => { delete globalThis.window; });
 describe('village and windmill shots', () => {
   test('four strict regional shots in the village-and-windmill stage', () => {
     assert.deepEqual(validateShotList(), []);
-    assert.equal(ACTIVE_PARITY_STAGE, 'residents-and-forest');
+    assert.equal(ACTIVE_PARITY_STAGE, 'full-scene');
     const shots = VILLAGE_IDS.map(id => PARITY_SHOTS.find(shot => shot.id === id));
     assert.deepEqual(selectShots({ stage: 'village-and-windmill' }).map(shot => shot.id).slice(-VILLAGE_IDS.length), VILLAGE_IDS);
     for (const shot of shots) {
@@ -54,6 +54,8 @@ describe('unbuiltAfterWindmill hide set', () => {
     const figure = new THREE.Group();
     const birds = new THREE.Group();
     world.group.add(...later);
+    // Only the test figure: the built station travelers are set aside meanwhile.
+    const builtTravelers = world.stationTravelers.splice(0);
     try {
       const d = fakeDiorama({ birds: { group: birds } });
       world.stationTravelers.push({ figure });
@@ -64,10 +66,11 @@ describe('unbuiltAfterWindmill hide set', () => {
       inPage(d, applyHideSetsInPage, { requested: [], worldCoreKeys: WORLD_CORE_MATERIAL_KEYS });
       assert.ok([...later, figure, birds].every(object => object.visible));
     } finally {
-      world.stationTravelers.length = 0;
+      world.stationTravelers.splice(0, world.stationTravelers.length, ...builtTravelers);
       world.group.remove(...later);
     }
-    assert.deepEqual(inPage(fakeDiorama(), applyHideSetsInPage, { requested: ['unbuiltAfterWindmill'], worldCoreKeys: [] }), { unbuiltAfterWindmill: 0 });
+    // Nothing after the terrain on this world: only the two station travelers (built with the station).
+    assert.deepEqual(inPage(fakeDiorama(), applyHideSetsInPage, { requested: ['unbuiltAfterWindmill'], worldCoreKeys: [] }), { unbuiltAfterWindmill: 2 });
   });
 });
 

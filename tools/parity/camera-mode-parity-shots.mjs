@@ -1,9 +1,9 @@
 // Camera-mode shots: each enters overview then the shot's mode and steps the rig at a fixed 1/60 s, so the
 // side and bridge glides land identically on both sites. Each comes as a strict shot (smoke and sparks
-// hidden) and a `-relaxed` twin with them visible. Systems the clone still lacks are hidden on both sites.
+// hidden) and a `-relaxed` twin with them visible. Nothing else is hidden.
 import { shot } from './parity-shot-factory-and-camera-poses.mjs';
 
-export const CAMERA_SHOT_HIDE = Object.freeze(['cloneMissing']);
+export const CAMERA_SHOT_HIDE = Object.freeze([]);
 
 // [id, mode, time of day, seconds stepped, reference capture]
 const CAMERA_SHOT_ROWS = Object.freeze([

@@ -15,7 +15,8 @@ reference. The logo and favicon in `assets/` are this repository's own original 
 
 **Status:** terrain, track, bridge, station, village, windmill, steam train, time of day, ink lines,
 pixel art, village residents, forest, rocks, the Free / Train / Bridge cameras, sheep, water and
-waterfall, clouds and the hot-air balloon are done. Birds and station travelers are in progress.
+waterfall, clouds, the hot-air balloon, the station travelers and the bird flocks are done. The
+full-scene sign-off and deployment prep are next.
 
 ## References
 

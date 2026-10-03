@@ -19,6 +19,7 @@ import { buildSheepFlock } from '../life/sheep/build-sheep-flock.js';
 import { buildWater } from './water/river-water-and-waterfall-builder.js';
 import { buildClouds } from './sky/cloud-field-spawner.js';
 import { buildBalloon } from './balloon/hot-air-balloon-burner-flame-and-flight.js';
+import { buildBirdPerches } from './perches/bird-perch-builders.js';
 
 // Keep-out radius around each resident's yard, read by the tree and rock scatters.
 const YARD_CLEARANCE = 2.2;
@@ -58,6 +59,8 @@ export const WORLD_BUILD_STEPS = Object.freeze([
   // The last draws from world.rand.
   { name: 'buildClouds', run: buildClouds },
   { name: 'buildBalloon', run: buildBalloon },
+  // Perches read the finished bridge, station and ground, so every flock site comes last.
+  { name: 'buildBirdPerches', run: buildBirdPerches },
 ]);
 
 /** Runs the steps in order; `skip` and `stopAfter` exist for partial builds in tests. Entries stay

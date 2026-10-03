@@ -1,6 +1,7 @@
 // Node driver for the clone simulation: a ctx with the same shape as the oracle's fake Diorama (sim
 // fields plus camera/controls stubs), the frame stepper in the shared order, and the one train
-// serializer used for both ctx shapes. Math.random swapping lives in original-simulation-oracle.mjs.
+// and life (birds, station travelers) serializers used for both ctx shapes. Math.random swapping lives
+// in original-simulation-oracle.mjs.
 import '../../src/core/disable-three-color-management.js';
 import * as THREE from 'three';
 import { installMinimalDomShim } from './minimal-dom-shim.mjs';
@@ -12,6 +13,7 @@ import { Train } from '../../src/train/train.js';
 import { BrakeSparks } from '../../src/train/brake-sparks.js';
 import { LocomotiveSmokePuffPool } from '../../src/train/locomotive-smoke-puff-pool.js';
 import { initTrainMotion } from '../../src/train/train-station-motion-controller.js';
+import { createWorldBirdSystem } from '../../src/engine/diorama-scene-composition.js';
 import { updateTrainAndEffects } from '../../src/train/train-frame-update.js';
 
 installMinimalDomShim();
@@ -32,8 +34,10 @@ export async function createCloneSimulation({ world = null } = {}) {
   const scene = new THREE.Scene();
   scene.matrixWorldAutoUpdate = false;
   scene.add(builtWorld.group);
+  const birds = createWorldBirdSystem(builtWorld);
+  scene.add(birds.group);
   const ctx = {
-    scene, world: builtWorld, lightingUniforms: LIGHTING_UNIFORMS,
+    scene, world: builtWorld, birds, lightingUniforms: LIGHTING_UNIFORMS,
     time: 0, s: 0, speed: 0, stopTimer: 0, justLeft: false,
     speedMul: 1, timeScale: 1, paused: false, mode: 'overview',
     updateTrain(dt) { return updateTrainAndEffects(this, dt); },
@@ -93,5 +97,44 @@ export function snapshotTrainState(ctx) {
       quaternion: car.obj.quaternion.toArray(),
       wheelAngles: car.wheels.map(wheel => wheel.mesh.rotation.x),
     })),
+  };
+}
+
+const quaternionOf = object => object.quaternion.toArray();
+
+function birdState({ figure, body, tail, wings, velocity }) {
+  return [
+    xyz(figure.position), quaternionOf(figure), xyz(figure.scale),
+    body.position.y, body.rotation.x, xyz(body.scale), tail.rotation.x,
+    wings.map(({ pivot, tip }) => [pivot.rotation.y, pivot.rotation.z, xyz(pivot.scale), tip.rotation.y, tip.rotation.z]),
+    xyz(velocity),
+  ];
+}
+
+function walkerState(walker) {
+  const { figure, rig } = walker;
+  const transform = mesh => [xyz(mesh.position), quaternionOf(mesh), xyz(mesh.scale)];
+  return {
+    figure: [xyz(figure.position), figure.rotation.y],
+    scalars: ['elapsed', 'bounce', 'swing', 'stopIndex', 'wait', 'progress', 'legIndex', 'turnSteps'].map(key => walker[key]),
+    path: [xyz(walker.start), xyz(walker.end)],
+    legs: walker.legs.map(leg => [xyz(leg.target), transform(leg.thigh), transform(leg.shin), transform(leg.shoe)]),
+    body: [rig.body.position.y, xyz(rig.body.rotation), xyz(rig.body.scale)],
+    head: xyz(rig.head.rotation),
+    hat: [rig.hat.rotation.x, rig.hat.rotation.z],
+    arms: rig.arms.map(({ arm }) => [arm.rotation.x, arm.rotation.z]),
+    cane: [rig.cane.rotation.x, rig.caneShaft.scale.y, rig.caneShaft.position.y],
+  };
+}
+
+/** Birds, flocks, the walker and the grandmother as plain arrays; reads parity-surface names only. */
+export function snapshotLifeState(ctx) {
+  const { world, birds } = ctx;
+  const grandmother = world.stationTravelers[1];
+  return {
+    flocks: birds.flocks.map(flock => [flock.mode, flock.changedAt]),
+    birds: birds.flocks.flatMap(flock => flock.birds.map(birdState)),
+    walker: walkerState(world.stationWalker),
+    grandmother: [grandmother.figure.rotation.x, grandmother.figure.rotation.z, grandmother.figure.scale.y, grandmother.head.rotation.y],
   };
 }

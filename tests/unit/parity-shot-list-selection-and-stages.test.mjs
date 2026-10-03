@@ -18,6 +18,7 @@ const FOREST_IDS = ['overview-day-settled-masked', 'overview-zoomed-orbited-mask
 const CAMERA_IDS = ['train-camera-day', 'bridge-camera-day', 'bridge-camera-evening', 'free-camera-day', 'train-camera-night']
   .flatMap(id => [id, `${id}-relaxed`]);
 const SHEEP_IDS = ['sheep-flock-day-closeup', 'sheep-flock-night-closeup', 'sheep-track-hop-1', 'sheep-track-hop-2', 'sheep-track-hop-3'];
+const LIFE_IDS = ['station-travelers-closeup', 'station-roof-birds-takeoff', 'bridge-birds-in-flight'];
 const WATER_SKY_IDS = ['overview-zoomed-day-masked', 'overview-zoomed-night-masked', 'overview-day-waterfall-roi', 'balloon-closeup-day',
   'balloon-closeup-night', 'water-closeup-day', 'water-closeup-night', 'waterfall-closeup-day', 'waterfall-closeup-night', 'clouds-debug-hidden'];
 // Shell-and-sky stage, in shot-list order.
@@ -38,8 +39,11 @@ describe('shot list and research captures', () => {
     const forestTail = [...FOREST_IDS, ...CAMERA_IDS, ...SHEEP_IDS, ...WATER_SKY_IDS];
     assert.deepEqual(forestStage.slice(-forestTail.length), forestTail);
     const strictCount = 30 + SKY_DIRECTION_IDS.length + WORLD_CORE_IDS.length + STATION_CLOSEUP_IDS.length + TRAIN_ONLY_IDS.length
-      + VILLAGE_IDS.length + forestTail.length;
-    assert.equal(selectShots({ stage: 'full-scene' }).length, strictCount);
+      + VILLAGE_IDS.length + forestTail.length + LIFE_IDS.length;
+    const fullStage = selectShots({ stage: 'full-scene' }).map(shot => shot.id);
+    assert.equal(fullStage.length, strictCount);
+    assert.deepEqual(fullStage.slice(-LIFE_IDS.length), LIFE_IDS);
+    assert.deepEqual(selectShots().map(shot => shot.id), fullStage, 'the active stage is the full scene');
     assert.deepEqual(selectShots({ ids: ['hud-day', 'sky-day'] }).map(shot => shot.id), ['hud-day', 'sky-day']);
     assert.throws(() => selectShots({ ids: ['nope'] }), /Unknown parity shot/);
     assert.deepEqual(expandHideSets(['skyOnly', 'trees']), ['world', 'train', 'birds', 'puffs', 'sparks', 'trees']);

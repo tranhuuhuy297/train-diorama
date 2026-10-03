@@ -1,5 +1,5 @@
 // Real engine core: renderer, frame loop, palettes, sky, shadows, post, pixel-art resolution,
-// the four camera rigs, the world and the train. Birds are added later at this facade's reserved slots.
+// the four camera rigs, the world, the bird flocks and the train.
 import '../core/disable-three-color-management.js';
 import * as THREE from 'three';
 import { LIGHTING_UNIFORMS } from '../materials/shared-lighting-uniforms.js';
@@ -174,6 +174,7 @@ export class Diorama {
     disposeFirstPersonControls(this);
     this.controls.removeEventListener('start', this.onOverviewInteraction);
     this.controls.dispose();
+    this.birds.dispose();
     this.brakeSparks.dispose();
     for (const glow of this.nightGlows) {
       glow.geometry.dispose();

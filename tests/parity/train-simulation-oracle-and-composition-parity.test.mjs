@@ -48,11 +48,11 @@ function assertMotionEqual(expected, actual, frame, label) {
 // Labels the scene layout through parity-surface names only, so both ctx shapes describe themselves alike.
 function compositionLayout(ctx) {
   const puffMeshes = new Set(ctx.puffs.map(puff => puff.mesh));
-  const name = object => (object === ctx.world.group ? 'world' : object === ctx.train.group ? 'train'
+  const name = object => (object === ctx.world.group ? 'world' : object === ctx.birds.group ? 'birds' : object === ctx.train.group ? 'train'
     : object === ctx.brakeSparks.mesh ? 'sparks' : object === ctx.sky ? 'sky' : puffMeshes.has(object) ? 'puff'
       : ctx.world.noShadow.includes(object) ? 'world-no-shadow' : ctx.train.noShadow.includes(object) ? `train-${ctx.train.noShadow.indexOf(object)}` : 'other');
   return {
-    children: ctx.scene.children.filter(child => child !== ctx.birds?.group).map(name),
+    children: ctx.scene.children.map(name),
     shadow: ctx.shadowHiddenObjects.map(name).filter(label => label !== 'world-no-shadow'),
     trainGlows: ctx.nightGlows.slice(-6).map(name),
     departure: [ctx.s === ctx.world.stationS + 1, ctx.speed, ctx.justLeft],
@@ -69,11 +69,12 @@ describe('train simulation parity with the original oracle', { skip, timeout: 60
     sims.cloneB = await createCloneSimulation();
   });
 
-  test('composition layout matches the oracle (world, train, sparks, sky, puffs; shadow list; train glows last)', () => {
+  test('composition layout matches the oracle (world, birds, train, sparks, sky, puffs; shadow list; train glows last)', () => {
     const d = { scene: new THREE.Scene() };
     composeDioramaScene(d);
     assert.deepStrictEqual(compositionLayout(d), sims.layout);
     assert.deepStrictEqual(sims.layout.trainGlows, ['train-3', 'train-4', 'train-5', 'train-6', 'train-7', 'train-8']);
+    assert.deepStrictEqual(sims.layout.children.slice(0, 5), ['world', 'birds', 'train', 'sparks', 'sky']);
   });
 
   test('variant A (original World) matches frame by frame; variant B (clone World) matches motion and smoke', t => {

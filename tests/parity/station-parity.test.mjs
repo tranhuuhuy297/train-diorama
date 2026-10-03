@@ -18,19 +18,18 @@ const TERRAIN_ONLY = { stopAfter: 'buildTerrain', skip: ['buildVillage', 'buildW
 
 const bytes = array => Buffer.from(array.buffer, array.byteOffset, array.byteLength);
 const assertBytes = (actual, expected, label) => assert.ok(bytes(actual).equals(bytes(expected)), `${label} bytes differ`);
-const figuresOf = world => new Set((world.stationTravelers ?? []).map(traveler => traveler.figure));
 const stationGroupOf = world => world.stationClockMinuteHand.parent.parent;
 const signOf = world => stationGroupOf(world).children.find(child => child.material?.type === 'MeshBasicMaterial');
 
 // Ordered (type, material type, colour, position) per child: insertion order drives merge and draw order.
-function childSequence(parent, excluded = new Set()) {
-  return parent.children.filter(child => !excluded.has(child)).map(child => [
+function childSequence(parent) {
+  return parent.children.map(child => [
     child.type, child.material?.type ?? null, child.material?.uniforms?.uColor?.value.getHexString() ?? null, ...child.position.toArray(),
   ]);
 }
 
-function assertSameSignature(originalRoot, cloneRoot, label, exclude = new Set()) {
-  const comparison = compareSceneSignatures(sceneGraphSignature(originalRoot, { exclude }), sceneGraphSignature(cloneRoot));
+function assertSameSignature(originalRoot, cloneRoot, label) {
+  const comparison = compareSceneSignatures(sceneGraphSignature(originalRoot), sceneGraphSignature(cloneRoot));
   assert.ok(comparison.equal, `${label}: ${comparison.report}`);
 }
 
@@ -61,15 +60,17 @@ describe('station parity with the original', { skip, timeout: 600_000 }, () => {
     assert.equal(clone.exclusions.length, 27);
   });
 
-  test('(c) world signature without the original figures, glows in order, child sequences', () => {
+  // Bird perches stay out of these stopAfter-buildStation comparisons: the original records four by
+  // now, the clone produces all of them in the last build step.
+  test('(c) world signature with the station travelers, glows in order, child sequences', () => {
     const { original, clone } = worlds;
-    const figures = figuresOf(original);
-    assertSameSignature(original.group, clone.group, 'world.group', figures);
-    const ordered = compareSceneSignatures(sceneGraphSignature(original.group, { exclude: figures }), sceneGraphSignature(clone.group), { ordered: true });
+    assertSameSignature(original.group, clone.group, 'world.group');
+    const ordered = compareSceneSignatures(sceneGraphSignature(original.group), sceneGraphSignature(clone.group), { ordered: true });
     assert.ok(ordered.equal, ordered.report);
     assert.equal(clone.noShadow.length, original.noShadow.length);
     original.noShadow.forEach((glows, index) => assertSameSignature(glows, clone.noShadow[index], `noShadow[${index}]`));
-    assert.deepStrictEqual(childSequence(stationGroupOf(clone)), childSequence(stationGroupOf(original), figures));
+    assert.deepStrictEqual(childSequence(stationGroupOf(clone)), childSequence(stationGroupOf(original)));
+    assert.equal(clone.stationTravelers.length, 2);
     const buildingOf = world => world.stationClockMinuteHand.parent;
     assert.deepStrictEqual(childSequence(buildingOf(clone)), childSequence(buildingOf(original)));
   });
@@ -104,6 +105,6 @@ describe('station parity with the original', { skip, timeout: 600_000 }, () => {
     const clone = createCloneWorld(TERRAIN_ONLY);
     assertBytes(clone.heights, original.heights, 'baked heights');
     assertBytes(clone.heightTex.image.data, original.heightTex.image.data, 'heightTex');
-    assertSameSignature(original.group, clone.group, 'terrain world', figuresOf(original));
+    assertSameSignature(original.group, clone.group, 'terrain world');
   });
 });

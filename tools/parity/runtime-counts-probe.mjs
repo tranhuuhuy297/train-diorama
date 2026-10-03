@@ -1,5 +1,5 @@
-// CLI: renderer.info, key world/sim fields, the exact village/windmill and water/cloud/balloon state in the identical
-// frozen state on both sites, the station and sheep sections, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
+// CLI: renderer.info, key world/sim fields, the exact village/windmill, water/cloud/balloon and traveler/bird state in
+// the identical frozen state on both sites, the station and sheep sections, the post-pass synthetic-input comparison and the hook/debug-menu checks. Usage:
 // node tools/parity/runtime-counts-probe.mjs [--target t] [--scenario default|sky-only|both] [--profile p] [--strict] [--skip-checks]
 // [--skip-post-probe] [--shot id] (that shot's prepared scene only) [--fields calls,triangles] (renderer fields compared, plus village)
 // [--camera-ui] (live-page camera mode/lock/key probe only; see camera-ui-runtime-probe.mjs)
@@ -14,12 +14,10 @@ import { HIDE_PRESETS, selectShots } from './parity-shot-list.mjs';
 import { runDebugMenuChecks, runHookExposureChecks } from './hook-and-debug-menu-browser-checks.mjs';
 import { capturePostSyntheticOutputs, comparePostOutputs } from './post-pass-synthetic-input-probe.mjs';
 import { probeStationState, compareStationAcrossSites } from './station-runtime-probe.mjs';
-import { collectVillageWindmillProbe } from './village-windmill-runtime-probe.mjs';
-import { collectForestResidentsProbe, compareForestResidentsProbe } from './forest-residents-runtime-probe.mjs';
+import { collectScenarioSections, judgeScenarioSections } from './scenario-probe-sections.mjs';
 import { diffTargets } from './probe-result-diffing.mjs';
 import { runCameraUiProbe, writeCameraUiReport } from './camera-ui-runtime-probe.mjs';
 import { probeSheepAcrossSites } from './sheep-flock-runtime-probe.mjs';
-import { collectWaterCloudsBalloonProbe, compareWaterCloudsBalloonProbe } from './water-clouds-balloon-runtime-probe.mjs';
 
 export { diffProbeResults } from './probe-result-diffing.mjs';
 
@@ -65,10 +63,7 @@ function collectRuntimeCounts() {
   };
 }
 
-const countScene = async page => ({
-  ...await page.evaluate(collectRuntimeCounts), village: await page.evaluate(collectVillageWindmillProbe), forest: await page.evaluate(collectForestResidentsProbe),
-  waterCloudsBalloon: await page.evaluate(collectWaterCloudsBalloonProbe),
-});
+const countScene = async page => ({ ...await page.evaluate(collectRuntimeCounts), ...await collectScenarioSections(page) });
 
 // One shot's scene exactly as the capture prepares it, rendered twice, then counted.
 async function probeShot(browser, target, shot) {
@@ -165,12 +160,10 @@ async function main() {
     console.log(`diff ${scenario}: ${list.length} field(s) differ; village ${village.length === 0 ? 'equal' : `differs in ${village.length} (first ${village[0]})`}`);
   }
   for (const scenario of Object.keys(output.diff ?? {})) {
-    const forest = compareForestResidentsProbe(output.targets.original.scenarios[scenario].forest, output.targets.clone.scenarios[scenario].forest);
-    console.log(`${forest.pass ? 'PASS' : 'FAIL'} forest ${scenario}: ${forest.pass ? `counts equal, exclusion delta ${forest.exclusionDelta}` : forest.failures.join('; ')}`);
-    if (!forest.pass) failures++;
-    const sky = compareWaterCloudsBalloonProbe(output.targets.original.scenarios[scenario].waterCloudsBalloon, output.targets.clone.scenarios[scenario].waterCloudsBalloon);
-    console.log(`${sky.pass ? 'PASS' : 'FAIL'} water/clouds/balloon ${scenario}${sky.pass ? '' : `: ${sky.failures.join('; ')}`}`);
-    if (!sky.pass) failures++;
+    for (const { label, pass, detail } of judgeScenarioSections(output.targets.original.scenarios[scenario], output.targets.clone.scenarios[scenario])) {
+      console.log(`${pass ? 'PASS' : 'FAIL'} ${label} ${scenario}${detail ? `: ${detail}` : ''}`);
+      if (!pass) failures++;
+    }
   }
   if (output.station) {
     const { pass, attempts, differing } = output.station;

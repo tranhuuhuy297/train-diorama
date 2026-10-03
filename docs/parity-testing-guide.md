@@ -232,10 +232,11 @@ nor skirt (`STRATA` define) nor one of the flat world-core signatures `uColor he
 `a39a8c|0.5` ballast, `8f8f9e|0.05` rail, `6e4a32|0.25` sleeper, `6b4630|0.12` plinth wood,
 `3f2a1f|0.1` plinth trim, `b8432f|0.12` red, `8a2f24|0.1` dark red, `b9ae98|0.35` stone; on the
 full original it keeps exactly the 53 core children). Presets: `skyOnly`, `transient`,
-`allFamilies` (every family above except `world`/`allButWorldCore`, plus the transients) and
-`cloneMissing` (`birds`, `stationFigures`: the systems later build steps add, hidden alike on
-both sites; on the clone it hides nothing; `sheep` left the preset when the flock landed and
-`water`, `clouds`, `balloon` when P12 landed, so every masked shot now compares them). The in-page
+`allFamilies` (every family above except `world`/`allButWorldCore`, plus the transients). The
+former `cloneMissing` preset (systems the clone still lacked, hidden alike on both sites) was
+retired when the station figures and birds landed (P13): every shot now compares the full scene
+except what it names itself. Presets and hide sets live in `parity-shot-stages-and-hide-sets.mjs`,
+validation in `parity-shot-validation.mjs`; `parity-shot-list.mjs` re-exports both. The in-page
 function lives in `page-hide-set-application.mjs`; restores run in reverse order so overlapping
 sets give back the original visibility.
 
@@ -243,10 +244,11 @@ Stages: `shell-and-sky` → `train` → `village-and-windmill` → `residents-an
 stage index is ≤ the selected stage; `--shots` overrides gating. To add a shot, append one line in
 `parity-shot-list.mjs` at its stage (the `shot()` factory and the camera poses live in
 `parity-shot-factory-and-camera-poses.mjs`); when a stage's features land, advance
-`ACTIVE_PARITY_STAGE` (now `residents-and-forest`).
+`ACTIVE_PARITY_STAGE` (now `full-scene`, so a plain `npm run parity:capture` runs every
+non-report-only shot).
 
-Residents and forest shots (stage `residents-and-forest`; hide `cloneMissing` + `transient`, so the
-full scene is compared with only the not-yet-built systems masked; deterministic thresholds):
+Residents and forest shots (stage `residents-and-forest`; hide `transient`, so the full scene is
+compared; the `-masked` ids are historical; deterministic thresholds):
 
 | Shot | Steps | Pose / actions | Reference |
 |---|---|---|---|
@@ -259,7 +261,7 @@ full scene is compared with only the not-yet-built systems masked; deterministic
 | `trees-sway-hold` | 0 | as t1 + `holdPausedFrames: 20`; relation identical to t1 | – |
 | `trees-debug-hidden` | 180 | overview home, `debugLayerOff: 'Trees'` | 14-overview-day-settled |
 
-Sheep shots (`sheep-flock-parity-shots.mjs`; same stage, hide `cloneMissing` + `transient`,
+Sheep shots (`sheep-flock-parity-shots.mjs`; same stage, hide `transient`,
 deterministic thresholds, in-page pose `sheepFlockCloseup` = rail sheep 2's center − outward·9 +
 (0, 5, 0) + tangent·3, looking at center + (0, 0.5, 0); both sites build it from their own route,
 which the probe proves equal):
@@ -276,7 +278,7 @@ K2 (`SHEEP_HOP_K2`, 824) is the probe's hop frame for sheep 2; the probe fails i
 differs from the pinned value, so re-measure and update the constant if train or sheep timing changes.
 
 `station-free-start-day` / `-night` (free-camera start pose, FOV 65, train parked away, hide
-`cloneMissing` + `train` + `transient`; references 07 and 17) moved here from the shell stage and
+`train` + `transient`; references 07 and 17) moved here from the shell stage and
 are strict now that the trees stand on the clone.
 
 By day `uTime` moves the tree sway and the water/waterfall patterns on both sites (local-glow
@@ -284,7 +286,7 @@ flicker is × uNight = 0), so t1 vs t0 shows the sway plus the water; the hold r
 the paused clock.
 
 Water, cloud and balloon shots (`water-clouds-balloon-parity-shots.mjs`; same stage, 600 frames
-stepped so sim time is 10.05 s, hide `cloneMissing` + `transient`, deterministic thresholds; the
+stepped so sim time is 10.05 s, hide `transient`, deterministic thresholds; the
 settled S1/S7 views are `overview-day-settled-masked` / `overview-night-masked` and the evening
 bridge is `bridge-camera-evening`):
 
@@ -303,6 +305,16 @@ bridge is `bridge-camera-evening`):
 
 Water and waterfall GLSL is never compared as text: the shaders are written independently, and
 these renders (plus S1/S7) are the proof of output parity.
+
+Travelers and birds shots (`station-travelers-and-birds-parity-shots.mjs`; stage `full-scene`, mode
+`orbit` (free) with a fixed pose applied after stepping, day, native, outline on, `transient`
+hidden, deterministic thresholds):
+
+| Shot | Seconds | Pose | Shows | Reference |
+|---|---|---|---|---|
+| `station-travelers-closeup` | 6 | (−45.479, 10.8, −10.431) → (−47.944, 9.9, −3.52) | walker and grandmother (her only view: she stands behind the default free-camera start) | – (no capture shows her) |
+| `station-roof-birds-takeoff` | 0.6 | (−44.5, 12.5, −8.5) → (−49.465, 11.9, −2.46) | the station-roof flock crouching / lifting off at load | – |
+| `bridge-birds-in-flight` | 9 | (−11.686, 11.96, 53.896) → (−4.75, 15.5, 36.5) | bridge flocks circling above the deck | 06b-bridge-camera-later |
 
 Village and windmill shots (stage `village-and-windmill`; 3 s stepped, hide `unbuiltAfterWindmill`
 + `transient`, house smoke visible, regions `village` + `windmill`, deterministic thresholds per
@@ -440,6 +452,14 @@ water/clouds/balloon <scenario>`: each site must have 33 clouds with Σ 464 inst
 to its own `heightTex` with size 124, a DoubleSide 225-vertex / 1152-index waterfall, both in
 `noShadow`, and every value equal across sites. Clouds are the last world.rand consumer, so this
 also proves the whole placement stream in the browser.
+
+`stationTravelersAndBirds` (`station-travelers-and-birds-runtime-probe.mjs`; in every scenario,
+null without birds or a walker; full float precision): `birdFlocks`, `birds`, `perchIds`,
+`flockModes`, `stationTravelers` and `walker` {`position`, `yaw`, `stopIndex`, `wait`}. Printed as
+`PASS|FAIL travelers/birds <scenario>`: each site must have 7 flocks, 18 birds, perch ids
+`bridge-1, bridge-2, bridge-3, station-roof, trackside-2, trackside-3, trackside-4`, 2 station
+travelers, and every value equal across sites. The per-scenario sections (village, forest,
+water/clouds/balloon, travelers/birds) are collected and judged by `scenario-probe-sections.mjs`.
 
 Post synthetic-input probe: a 64×64 colour ramp and a two-level float depth texture go through
 each site's post material for 18 combinations of outline × (night, saturation) × (pixel,
@@ -680,8 +700,9 @@ open, `body.hud-hidden`) are identical on both sites.
   of bridge (controls target = camTarget, goal x within ±4.9), scripted free flight to x ±61, z −61,
   the ground clamp and the 200 ceiling, no flight while unlocked, and the pose save/restore.
   Both sides get the same synchronous PLC stub and their own `mulberry32(4242)` Math.random stream.
-- Browser: the five camera shots and their `-relaxed` twins (`cloneMissing` hidden on both sites)
-  are pixel-identical (mean 0.000, max channel diff 0). Framing matches the references (train cam
+- Browser: the five camera shots and their `-relaxed` twins (at P10 time with `cloneMissing` hidden
+  on both sites; since P13 the strict shots hide only `transient` and the twins hide nothing) are
+  pixel-identical (mean 0.000, max channel diff 0). Framing matches the references (train cam
   loco right of centre with the coaches trailing up-left; bridge cam low and side-on with the whole
   train on the deck at 10.5 s; free cam on the platform).
 - Probe: `--camera-ui` passes on both sites and both sites answer identically.
@@ -742,3 +763,33 @@ open, `body.hud-hidden`) are identical on both sites.
   6 / 25). With `cloneMissing` hidden, `--shot overview-day-settled-masked --fields
   calls,triangles,textures` gives 1092 / 1,749,544 / 6 on both sites, `--shot balloon-closeup-night`
   535 / 1,671,594 / 6 on both. Debug-menu checks (Clouds toggle logs and visibility) pass on both.
+
+### Station travelers and birds (P13, 2026-10-03)
+
+- **First-build draw-count rule.** npr caches materials per module, so a second World in the same
+  process draws fewer UUID randoms (the original's `buildStation` draws 2424 on a second build).
+  `tests/parity/station-travelers-and-birds-parity.test.mjs` therefore builds one clone World and
+  one original World first in its own process (`tests/helpers/station-travelers-and-birds-first-build.mjs`),
+  counting draws inside `buildStation` (registry wrapper / prototype wrapper), the first bird
+  material request and `createBirdSystem`: 2532 / 4 / 948 on both sides. Never measure these
+  through a second construction.
+- Node block A (clone only, `tests/parity/fixtures/station-travelers-and-birds-expected.json`):
+  perch ids and full-precision track distances, flight heights, centres, sizes/phases/headings,
+  delays, lane x 0.20999999999999985 (figure, start/end, stops, leg targets) and grandmother x
+  −0.5300000000000002, the merged rig structure, walker-only stepping (0.05 then 10 800 × 1/60) with
+  `[STATION]` events at frames 298, 1107, 1588, … 10 629 and the exact final state, IK bones at
+  0.36 within 1e−12, zero `Math.random` draws in `birds.update`, and the `[BIRDS]` timeline to
+  20.5 s. Block B (original present): perches deep-equal, the whole `world.group` signature with
+  both travelers, the constructed walker and both rig trees, flock/bird records and the bird group
+  signature, then the oracle and the clone driver in lockstep (first step 0.05, then 1/60 for
+  180 s; and real dt 0.05 at time scale 2 for 60 s) comparing `snapshotLifeState` every frame and
+  the `[BIRDS]` / `[STATION]` / `[VILLAGE]` lines with their frame numbers (about 10 s in total).
+  Earlier station/village/forest/sheep/water suites now compare `world.group` including the
+  travelers; stopAfter-`buildStation` tests never compare `birdPerches`.
+- Browser: `station-travelers-closeup`, `station-roof-birds-takeoff`, `bridge-birds-in-flight`,
+  `free-camera-day`, `bridge-camera-day`, `overview-day` and `station-free-start-day` are
+  pixel-identical (mean 0.000, max channel diff ≤ 1).
+- Probe: frozen default 1373 calls / 1,762,696 triangles / 419 geometries / 6 textures / 25
+  programs on both sites (and 2 / 962 sky-only); 0 differing fields; `PASS travelers/birds` in both
+  scenarios.
+

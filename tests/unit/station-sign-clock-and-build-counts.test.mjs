@@ -56,14 +56,19 @@ test('(a) the sign paints exactly the 20 recorded context writes', () => {
   assert.deepStrictEqual(canvas.operations, SIGN_RECORDING);
 });
 
-test('stepSimulation steps the train, then hands sim time, sim dt and the train state to the world update', () => {
+test('stepSimulation steps the train, the world (sim time, dt, train state), then the birds', () => {
   const calls = [];
   const position = { x: 1, y: 2, z: 3 };
-  const train = { loco: { obj: { position } }, totalLength: 25.65 };
-  const d = { time: 1, s: 7, speed: 3, train, updateTrain: dt => calls.push(['train', dt]), world: { update: (...args) => calls.push(args) } };
+  const cars = [];
+  const train = { loco: { obj: { position } }, totalLength: 25.65, cars };
+  const d = {
+    time: 1, s: 7, speed: 3, train, updateTrain: dt => calls.push(['train', dt]),
+    world: { update: (...args) => calls.push(args) }, birds: { update: (...args) => calls.push(['birds', ...args]) },
+  };
   stepSimulation(d, 0.25);
-  assert.deepStrictEqual(calls, [['train', 0.25], [1.25, 0.25, position, { distance: 7, speed: 3, length: 25.65 }]]);
+  assert.deepStrictEqual(calls, [['train', 0.25], [1.25, 0.25, position, { distance: 7, speed: 3, length: 25.65 }], ['birds', 1.25, 7, 3, cars]]);
   assert.equal(calls[1][2], position, 'the locomotive position object itself, not a copy');
+  assert.equal(calls[2][4], cars, 'the live car list');
 });
 
 test('buildStation runs after buildBridge and before buildTerrain', () => {

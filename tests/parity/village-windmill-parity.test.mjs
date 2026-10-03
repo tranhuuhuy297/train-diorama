@@ -28,7 +28,6 @@ const assertSameBits = (actual, expected, label) => {
 };
 const housesOf = world => [...new Set(world.houseSmoke.map(puff => puff.mesh.parent))];
 const shrubsOf = world => world.group.children[world.group.children.indexOf(housesOf(world).at(-1)) + 1];
-const figuresOf = world => new Set((world.stationTravelers ?? []).map(traveler => traveler.figure));
 
 // Index of `value` in the world stream (mulberry32(42)), i.e. how many draws came before it.
 function drawIndexOf(value) {
@@ -42,12 +41,10 @@ function assertSameSignature(originalRoot, cloneRoot, label, exclude = new Set()
   assert.ok(comparison.equal, `${label}: ${comparison.report}`);
 }
 
-// Child-index chain and types from world.group down to the object; excluded siblings are not counted.
-function pathFrom(root, object, excluded = new Set()) {
+// Child-index chain and types from world.group down to the object.
+function pathFrom(root, object) {
   const steps = [];
-  for (let node = object; node !== root && node.parent; node = node.parent) {
-    steps.unshift(`${node.parent.children.filter(child => !excluded.has(child)).indexOf(node)}:${node.type}`);
-  }
+  for (let node = object; node !== root && node.parent; node = node.parent) steps.unshift(`${node.parent.children.indexOf(node)}:${node.type}`);
   return steps.join('/');
 }
 
@@ -102,8 +99,7 @@ describe('village and windmill parity with the original', { skip, timeout: 600_0
     const houses = [housesOf(original), housesOf(clone)];
     houses[0].forEach((house, index) => assertSameSignature(house, houses[1][index], `house ${index}`));
     assert.equal(clone.noShadow.length, original.noShadow.length);
-    // The original's station figures (still missing on the clone) shift the station children after them.
-    const describeEntry = (world, entry) => `${entry.type} ${pathFrom(world.group, entry, figuresOf(world))}`;
+    const describeEntry = (world, entry) => `${entry.type} ${pathFrom(world.group, entry)}`;
     assert.deepStrictEqual(clone.noShadow.map(entry => describeEntry(clone, entry)), original.noShadow.map(entry => describeEntry(original, entry)));
   });
 
@@ -119,8 +115,8 @@ describe('village and windmill parity with the original', { skip, timeout: 600_0
     assert.deepStrictEqual(clone.exclusions, original.exclusions);
     assert.deepStrictEqual(clone.buildingFoundations, original.buildingFoundations);
     assertSameSignature(windmills[0], windmills[1], 'windmill');
-    assertSameSignature(original.group, clone.group, 'world.group', figuresOf(original));
-    const ordered = compareSceneSignatures(sceneGraphSignature(original.group, { exclude: figuresOf(original) }), sceneGraphSignature(clone.group), { ordered: true });
+    assertSameSignature(original.group, clone.group, 'world.group');
+    const ordered = compareSceneSignatures(sceneGraphSignature(original.group), sceneGraphSignature(clone.group), { ordered: true });
     assert.ok(ordered.equal, ordered.report);
   });
 

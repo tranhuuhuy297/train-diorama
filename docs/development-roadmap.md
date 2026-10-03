@@ -17,7 +17,7 @@ next phase starts. Dependencies are listed as the phases whose output a phase re
 | P10 | Free-fly camera completion, train fly-along, bridge camera | P03 | Complete (headed pointer-lock check pending) |
 | P11 | Sheep (pasture + trackside flee/return) | P05, P09 | Complete |
 | P12 | Water, clouds, balloon | P05 | Complete |
-| P13 | Station travellers, birds | P06, P09 | Pending |
+| P13 | Station travellers, birds | P06, P09 | Complete |
 | P14 | Full-scene parity signature, deployment prep | P01–P13 | Pending |
 
 P01 delivers a runnable shell: the loader resolves, the HUD is fully interactive, settings
@@ -145,4 +145,18 @@ consumer: the next draw after a full build is 0.23735972004942596 on both sides,
 match bit for bit, the whole `world.group` signature matches (only the original's station figures
 excluded), the UUID draws per step are 24 / 2128 / 2940 on both sides, and 300 sim-seconds of
 drift, camera pushes and flight match exactly. The water, waterfall and balloon left the
-`cloneMissing` preset, which now hides only the birds and the station figures.
+`cloneMissing` preset, which then hid only the birds and the station figures (retired in P13).
+
+P13 adds the remaining ambient life. An old traveler in a blue coat and hat walks the widened
+platform with his cane between three stops (wait, turn on the spot, short IK-driven steps; the cane
+is resized every frame to touch the floor), logging `[STATION] Traveler walks / arrives: stop N`.
+A grandmother with spectacles, a bun and a handbag waits by her suitcase stack; both sway idly and
+turn their heads toward an approaching locomotive. Seven bird flocks (18 birds) sit on the bridge
+rails, the station roof and the grass beside the track; they take off when the train approaches,
+circle, return when the track is clear and land, logging `[BIRDS]` lines. All perches come from one
+last build step with bit-identical records. Node parity is bit-identical: first-build draw counts
+2532 / 948 / 4, the whole `world.group` signature with the travelers, flock init, and 180 sim-seconds
+(plus 60 s at sim dt 0.1) of every bird, flock, walker and grandmother transform, with identical
+`[BIRDS]` / `[STATION]` / `[VILLAGE]` lines per frame. The three new shots are pixel-identical,
+`cloneMissing` is retired, the active stage is `full-scene`, and the frozen default overview now
+matches the original's renderer counts exactly (1373 / 1,762,696 / 419 / 6 / 25).

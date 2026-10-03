@@ -1,0 +1,62 @@
+{
+  "draws": {"buildStation": 2532, "createBirdSystem": 948, "birdMaterial": 4},
+  "perchIds": ["bridge-1", "bridge-2", "bridge-3", "station-roof", "trackside-2", "trackside-3", "trackside-4"],
+  "perches": [
+    {"id": "bridge-1", "positions": [[-15.909, 9.96, 38.296], [-13.629, 9.96, 38.014], [-9.438, 9.96, 37.674]], "outward": [0.121, 0, 0.993], "trackDistance": 11.045459100304702},
+    {"id": "bridge-2", "positions": [[-5.56, 9.96, 34.33], [-3.949, 9.96, 34.33]], "outward": [0, 0, -1], "trackDistance": 21.63069073809671},
+    {"id": "bridge-3", "positions": [[3.185, 9.96, 37.67], [8.247, 9.96, 37.67], [10.036, 9.959, 37.686]], "outward": [0, 0, 1], "trackDistance": 30.37501252583793},
+    {"id": "station-roof", "positions": [[-49.01, 11.67, -3.911], [-49.894, 11.568, -3.044], [-49.493, 11.628, -0.427]], "outward": [-0.999, 0, -0.038], "trackDistance": 231.95464110639873},
+    {"id": "trackside-2", "positions": [[42.425, 9.789, -0.294], [42.636, 9.983, -1.877]], "outward": [-0.986, 0, 0.168], "trackDistance": 99.40913190274232},
+    {"id": "trackside-3", "positions": [[10.2, 9.109, -40.398], [9.248, 8.747, -41.26], [7.117, 8.912, -41.647]], "outward": [0.334, 0, -0.943], "trackDistance": 154.63642740426585},
+    {"id": "trackside-4", "positions": [[-31.663, 8.79, -27.253], [-33.236, 8.659, -26.05]], "outward": [0.74, 0, 0.672], "trackDistance": 201.5796285805608}
+  ],
+  "flocks": [
+    {"id": "bridge-1", "center": [-12.992, 9.96, 37.995], "flightHeight": 16.40723705291748, "birds": [[0.4281, 1.7123, -0.3388], [0.4414, 4.0771, 0.7206], [0.5112, 5.4154, -0.0315]]},
+    {"id": "bridge-2", "center": [-4.754, 9.96, 34.33], "flightHeight": 14.96, "birds": [[0.4893, 2.0298, -3.2459], [0.4242, 4.4038, -3.745]]},
+    {"id": "bridge-3", "center": [7.156, 9.96, 37.675], "flightHeight": 18.897689819335938, "birds": [[0.4333, 3.9031, 0.1314], [0.4647, 3.4915, 0.0258], [0.4555, 2.8466, -0.1753]]},
+    {"id": "station-roof", "center": [-49.465, 11.622, -2.46], "flightHeight": 20.799787521362305, "birds": [[0.4381, 1.4615, -0.9017], [0.5134, 1.8624, -2.3546], [0.4593, 2.1503, -1.92]]},
+    {"id": "trackside-2", "center": [42.53, 9.886, -1.085], "flightHeight": 20.11758804321289, "birds": [[0.4104, 0.2857, -1.1956], [0.5042, 0.6032, -0.9546]]},
+    {"id": "trackside-3", "center": [8.855, 8.923, -41.101], "flightHeight": 18.96786117553711, "birds": [[0.4495, 1.5808, 3.2908], [0.4438, 4.817, 2.3973], [0.5133, 5.7122, 2.164]]},
+    {"id": "trackside-4", "center": [-32.45, 8.725, -26.652], "flightHeight": 26.360017776489258, "birds": [[0.4766, 5.5696, 0.9994], [0.5111, 4.1394, 1.0548]]}
+  ],
+  "walkerLaneX": 0.20999999999999985,
+  "grandmotherX": -0.5300000000000002,
+  "walkerSteps": {"first": 0.05, "dt": "1/60", "frames": 10800},
+  "walkerEvents": [
+    [298, "[STATION] Traveler walks: stop 1"],
+    [1107, "[STATION] Traveler arrives: stop 1"],
+    [1588, "[STATION] Traveler walks: stop 2"],
+    [3247, "[STATION] Traveler arrives: stop 2"],
+    [3847, "[STATION] Traveler walks: stop 3"],
+    [4834, "[STATION] Traveler arrives: stop 3"],
+    [5195, "[STATION] Traveler walks: stop 1"],
+    [5868, "[STATION] Traveler arrives: stop 1"],
+    [6349, "[STATION] Traveler walks: stop 2"],
+    [8008, "[STATION] Traveler arrives: stop 2"],
+    [8608, "[STATION] Traveler walks: stop 3"],
+    [9595, "[STATION] Traveler arrives: stop 3"],
+    [9956, "[STATION] Traveler walks: stop 1"],
+    [10629, "[STATION] Traveler arrives: stop 1"]
+  ],
+  "walkerFinal": {"position": [0.20999999999999985, 0.4, 4.3], "rotationY": 0.010796326794895172, "stopIndex": 1, "wait": 5.15000000000001, "caneShaftScaleY": 0.9097624050644615},
+  "birdEventFrames": 1228,
+  "birdEvents": [
+    ["0.050", "[BIRDS] Take off: station-roof, train approaches"],
+    ["0.050", "[BIRDS] Take off: trackside-4, train approaches"],
+    ["4.900", "[BIRDS] Take off: bridge-1, train approaches"],
+    ["6.317", "[BIRDS] Take off: bridge-2, train approaches"],
+    ["7.067", "[BIRDS] Return: station-roof, track clear"],
+    ["7.067", "[BIRDS] Return: trackside-4, track clear"],
+    ["7.483", "[BIRDS] Take off: bridge-3, train approaches"],
+    ["10.667", "[BIRDS] Perch: station-roof"],
+    ["10.667", "[BIRDS] Perch: trackside-4"],
+    ["14.167", "[BIRDS] Return: bridge-1, track clear"],
+    ["15.267", "[BIRDS] Return: bridge-2, track clear"],
+    ["16.683", "[BIRDS] Take off: trackside-2, train approaches"],
+    ["16.883", "[BIRDS] Return: bridge-3, track clear"],
+    ["17.783", "[BIRDS] Perch: bridge-1"],
+    ["18.883", "[BIRDS] Perch: bridge-2"],
+    ["20.500", "[BIRDS] Perch: bridge-3"]
+  ],
+  "flockModesAt180": {"frames": 10801, "modes": [["bridge-1", "perched"], ["bridge-2", "perched"], ["bridge-3", "perched"], ["station-roof", "flying"], ["trackside-2", "perched"], ["trackside-3", "perched"], ["trackside-4", "flying"]]}
+}

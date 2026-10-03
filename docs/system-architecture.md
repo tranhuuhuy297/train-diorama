@@ -106,7 +106,8 @@ their reserved constructor slot in a later phase without changing this file's pu
 - `train/*`: landed in P07 (see "Train" below).
 - `life/*` (villagers, sheep, station travellers, birds): added across P09–P13; the village
   residents landed in P09 (see "Village residents, forest and rocks" below), the sheep flock in
-  P11 (see "Sheep flock" below).
+  P11 (see "Sheep flock" below), the station travelers and birds in P13 (see "Station travelers
+  and birds" below).
 
 ## Shared lighting uniform bag (`src/materials/shared-lighting-uniforms.js`)
 
@@ -925,3 +926,104 @@ frame step 7 d.world.updateCloudCamera(d.camera.position, dt)   after updateCame
   scenario field `waterCloudsBalloon` (see the parity testing guide).
 - `tests/helpers/clone-simulation-driver.mjs`: `stepCloneFrame` calls
   `ctx.world.updateCloudCamera(ctx.camera.position, dt)` unguarded.
+
+## Station travelers and birds (`src/life/station/`, `src/life/birds/`, `src/world/perches/`, P13)
+
+```
+build step 6 buildStation        … sign → buildStationTravelerOldMan(site, materials) → createPlatformWalker(site, oldMan)
+                                  → world.stationWalker; stationTravelers[0] = {figure, head, 0.8, 0}
+                                  → buildTravelerSuitcases → buildStationGrandmother(site, {...materials, shoulderGeometry})
+                                  → stationTravelers[1] = {figure, head, 0.7, 1.7} → buildGrandmotherSuitcaseStack → lamps …
+build step 16 buildBirdPerches    bridge-1..3 → station-roof → trackside-2..4 (trackside-1 is always empty) → world.birdPerches
+composeDioramaScene               world → createWorldBirdSystem(world) → scene.add(birds.group) → freeCameraPose → train …
+updateWorld                       1 clock → 2/3 sheep → 4 travelerEvent = stationWalker.update(dt) → 5 residentEvent
+                                  → 6 log resident, then traveler (one block) → 7 updateStationTravelers → 8.. smoke, rotor, clouds, balloon
+stepSimulation                    time/uTime → updateTrain → world.update → birds.update(time, s, speed, train.cars)
+Diorama.dispose                   … disposeFirstPersonControls → controls listener → controls.dispose() → birds.dispose() → brakeSparks …
+```
+
+| module | exports |
+|---|---|
+| `world/perches/bird-perch-builders.js` | `BRIDGE_PERCH_GROUPS`, `STATION_ROOF_PERCH_OFFSETS`, `TRACKSIDE_PERCH_CLUSTERS`, `buildBirdPerches(world)` |
+| `life/station/station-traveler-old-man-figure.js` | `buildStationTravelerOldMan(site, materials)` → `{figure, head, legs, rig, shoulderGeometry}` |
+| `life/station/station-walker-controller.js` | `WALKER_STEP_DURATION` 0.7, `class StationWalker`, `createPlatformWalker(site, oldMan)` |
+| `life/station/station-walker-leg-ik-and-body-animation.js` | `WALKER_LEG_SEGMENT_LENGTH` 0.36, `poseWalkerLegs(walker)`, `animateWalkerBody(walker)` |
+| `life/station/station-grandmother-figure.js` | `buildStationGrandmother(site, materials)` → `{figure, head}` |
+| `life/station/station-figure-parts.js` | `attachMesh(geometry, material, parent, position, scale?)` |
+| `life/station/station-travelers-idle-and-head-look.js` | `updateStationTravelers(world, elapsed, dt, trainPosition)` |
+| `life/birds/bird-geometry-builder.js` | `createBirdGeometries()`, `createBirdRig(geometries, material)`, `disposeBirdGeometries(geometries)` |
+| `life/birds/bird-flock-state-machine.js` (no three) | `decideBirdFlock(snapshot, elapsed, state)`, `computeFlockSnapshot(flock, trainDistance, trainSpeed, cars, trackLength, target?)` |
+| `life/birds/bird-flight-poses.js` | `createBirdFlightPoses({targetRotation, nextPosition})` → `{perched, flying, returning}` |
+| `life/birds/bird-wing-body-animator.js` | `rotateBirdTowards`, `orientBirdAlongFlight`, `animateBirdWingsAndBody` |
+| `life/birds/bird-system.js` | `createBirdSystem({perches, trackLength, heightAt, canopyHeightAt, material})` → `{group 'Bird flocks', flocks, update, dispose}` |
+| `engine/diorama-scene-composition.js` | `createWorldBirdSystem(world)` (bird material npr `{vertexColors: true, stipple: 0.1, stippleScale: 4}` requested first) |
+
+- **One perch producer.** The original records the bridge perches inside its bridge build, the
+  roof perch inside the station build and the trackside ones last; the clone produces all of them
+  in build step 16. Frames, the bridge span, the station group transform, final heights and
+  exclusions never change after they are created, so the records are bit-identical (R12). Tests
+  that stop at `buildStation` or earlier therefore never compare `birdPerches` (the original has 4
+  entries there, the clone 0). Seven flocks, 18 birds; ids keep the cluster index, so the list
+  reads `bridge-1..3, station-roof, trackside-2, trackside-3, trackside-4`.
+- **Platform widening by float operations, not literals.** `createPlatformWalker` builds the
+  walker at the pre-widening lane (x = −0.6·o), then applies `x + o·E` to the figure and the
+  half-shift `w = (o·E)/2` (figure `− w`; start, end, the three stops and both leg targets `+ w`).
+  With o = −1 and E = 0.7800000000000002 every lane x is 0.20999999999999985 (not 0.21); the
+  grandmother ends at −0.5300000000000002 and the roof perches get `+ outward·E` after
+  `localToWorld`. This refines the contract's "O −0.21 baked" shorthand.
+- **Contract clarifications.** `buildStationTravelerOldMan` also returns `shoulderGeometry` (the
+  only geometry the grandmother shares, R8); `createPlatformWalker(site, oldMan)` is the station's
+  walker factory; `computeFlockSnapshot` takes an optional `target` that it overwrites and returns
+  (one scratch per frame instead of the original's per-frame object).
+- **Rig and merges.** Traveler: 6 loose leg meshes (IK) then the body group; body = arm−1, arm+1,
+  head, merged trousers/coat/trim; head = hat group, merged skin/grey hair/dark wood; hat = merged
+  hat/band/trim; arm−1 holds the cane group (re-offset to (−0.09, −0.58, 0.055)). Grandmother: head,
+  then 7 merged batches. Material creation order (opaque sort ties) is traveler outfit after the
+  sign, before the suitcase leathers; grandmother dress/shawl/handbag before the stack leathers.
+- **Walker.** Wait 5 s, then turn on the spot at 1.8 rad/s, two in-place steps, then 0.7 s steps
+  of ≤ 0.2 u to the next stop (waits 8 / 10 / 6 s after stops 1 / 2 / 3). The swinging foot follows
+  `(p·p)·(3 − 2p)` with a 0.085 lift; the 2-bone IK (L = 0.36) keeps the knee forward; the body
+  bob/sway, head/hat tilt, arm swing and cane are driven by the eased bounce/swing; the cane shaft
+  is resized each frame from fresh world matrices so its tip touches the platform. `update`
+  returns `undefined` when nothing is logged.
+- **Idle + head-look.** Non-walkers sway (roll .018, nod .012, stretch .008 of base scale); every
+  traveler turns the head toward the locomotive, clamped to ±0.85 rad and faded by
+  `1 − smoothstep(12, 32, distance)` (distance from the figure origin), easing at `min(1, 2.8·dt)`.
+  Scratch vectors are module-level, so World gains no fields.
+- **Birds.** Own PRNG mulberry32(7821), three draws per bird (size, phase, heading). Per flock:
+  centre, tangent, flight height (24 orbit samples clearing ground + 3 and canopy + 2). Modes
+  perched → flying (train within max(19, 2.5v) ahead or a car within 12 m while v > 0.2) →
+  returning (after > 7 s once no car within 24 m and no moving train within max(26, 3v)) → perched
+  after 3.6 s, or back to flying if the track stops being clear. Poses: perched (peck/look idle,
+  folded wings), flying (orbit 7 ± 3 out, ±5 along, bobbing at flight height, eased from the
+  departure with the launch velocity fading), returning (Hermite glide home with momentum and a
+  0.7 hop). Orientation: capped slerp (≤ 4 rad/s, eased by 1 − e^(−9dt)), pitch along the climb,
+  bank −turn/dt·0.22 clamped to ±0.48. Wings: 21 rad/s beat, glides, spread, landing flare and
+  touchdown squash. No per-frame allocations and no random draws after construction.
+- **Allocation parity.** First-construction Math.random draws: `buildStation` 2532 (traveler 608,
+  suitcases 56, grandmother 500 inside it), bird material 4, `createBirdSystem` 948 (20 geometries
+  + group + 18 × 12 objects); equal on both sides. The clone's frozen default overview now matches
+  the original exactly: 1373 calls / 1,762,696 triangles / 419 geometries / 6 textures / 25
+  programs.
+- **Quirks kept for parity:** trackside-1 is a dead cluster (all candidates on the bridge); the
+  station-roof flock keeps circling through the 4 s stop (clear needs every car > 24 m away); the
+  bank angle depends on dt; the walker's shoe has no ankle pitch; head-look distance is measured
+  from the figure origin, not the head; the grandmother stands behind the default free-camera
+  start, so the default Free view never shows her.
+
+### Parity tooling additions (modification-map entries)
+
+- `tools/parity/parity-shot-list.mjs` was split: stages, thresholds, hide sets/presets and
+  `expandHideSets` moved to `parity-shot-stages-and-hide-sets.mjs`, validation to
+  `parity-shot-validation.mjs` (`shotListErrors`); the list re-exports them, so importers are
+  unchanged. `ACTIVE_PARITY_STAGE` is `full-scene`; the `cloneMissing` preset is gone (every shot
+  that used it now hides only what it names, usually `transient`).
+- `tools/parity/station-travelers-and-birds-parity-shots.mjs` (new): `station-travelers-closeup`
+  (6 s), `station-roof-birds-takeoff` (0.6 s), `bridge-birds-in-flight` (9 s); mode `orbit`, day,
+  fixed poses, `transient` hidden, stage `full-scene`.
+- `tools/parity/station-travelers-and-birds-runtime-probe.mjs` (new) and
+  `tools/parity/scenario-probe-sections.mjs` (new; collects village/forest/water/travelers-birds
+  sections and judges them per scenario) wired into `runtime-counts-probe.mjs`.
+- `tests/helpers/clone-simulation-driver.mjs`: birds in composition order (via
+  `createWorldBirdSystem`) and `snapshotLifeState(ctx)` (birds, flock modes, walker, grandmother).
+  `tests/helpers/sheep-flock-parity-lockstep.mjs`: `runSheepLockstep` takes `logPrefixes`.

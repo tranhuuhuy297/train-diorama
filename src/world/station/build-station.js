@@ -10,6 +10,9 @@ import { buildStationClock } from './station-wall-clock.js';
 import { buildStationNameBoard, buildStationSign } from './station-name-board-sign.js';
 import { buildTravelerSuitcases, buildGrandmotherSuitcaseStack } from './station-luggage-props.js';
 import { buildStationLamps } from './station-lamps-with-night-glow.js';
+import { buildStationTravelerOldMan } from '../../life/station/station-traveler-old-man-figure.js';
+import { createPlatformWalker } from '../../life/station/station-walker-controller.js';
+import { buildStationGrandmother } from '../../life/station/station-grandmother-figure.js';
 import { buildStationStairs, buildStationFootpath } from './station-stairs-railings-footpath.js';
 
 export function buildStation(world) {
@@ -28,9 +31,13 @@ export function buildStation(world) {
 
   buildStationNameBoard(site, materials);
   buildStationSign(site);
-  // Walking traveler slot: his figure joins the station group here, before his cases.
+  // The walking traveler joins the station group before his cases, the grandmother before her stack.
+  const oldMan = buildStationTravelerOldMan(site, materials);
+  world.stationWalker = createPlatformWalker(site, oldMan);
+  world.stationTravelers.push({ figure: oldMan.figure, head: oldMan.head, baseScale: 0.8, phase: 0 });
   buildTravelerSuitcases(site);
-  // Grandmother slot: her figure joins here (reusing the traveler parts), before her stacked cases.
+  const grandmother = buildStationGrandmother(site, { ...materials, shoulderGeometry: oldMan.shoulderGeometry });
+  world.stationTravelers.push({ figure: grandmother.figure, head: grandmother.head, baseScale: 0.7, phase: 1.7 });
   buildGrandmotherSuitcaseStack(site);
   buildStationLamps(world, site, materials);
 

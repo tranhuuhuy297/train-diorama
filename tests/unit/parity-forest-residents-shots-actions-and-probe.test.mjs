@@ -1,5 +1,5 @@
 // Residents/forest parity tooling in node: the stage's shots and their validation, the water and
-// cloneMissing hide sets, the in-page shot actions, the probe section and the same-site checks.
+// figure/bird hide sets, the in-page shot actions, the probe section and the same-site checks.
 import '../../src/core/disable-three-color-management.js';
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,9 +22,9 @@ after(() => { delete globalThis.window; });
 
 describe('residents and forest shots', () => {
   test('stage, masks, poses, actions and freshness', () => {
-    assert.equal(ACTIVE_PARITY_STAGE, 'residents-and-forest');
+    assert.equal(ACTIVE_PARITY_STAGE, 'full-scene');
     assert.deepEqual(validateShotList(), []);
-    const masked = ['birds', 'stationFigures', 'puffs', 'sparks'];
+    const masked = ['puffs', 'sparks'];
     for (const id of ['overview-day-settled-masked', 'overview-zoomed-orbited-masked', 'overview-night-masked', 'village-residents-yard', 'trees-debug-hidden']) {
       const shot = byId(id);
       assert.deepEqual([shot.stage, shot.thresholdClass, shot.reportOnly, expandHideSets(shot.hide)], ['residents-and-forest', 'deterministic', false, masked]);
@@ -42,9 +42,11 @@ describe('residents and forest shots', () => {
 });
 
 describe('hide sets and in-page actions', () => {
-  test('water hides the water and waterfall meshes only; cloneMissing hides nothing the clone lacks', () => {
+  test('water hides the water and waterfall meshes only; figures resolve to both station travelers', () => {
     const d = { world, scene: new THREE.Scene() };
-    assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: expandHideSets(['cloneMissing']), worldCoreKeys: [] }), { birds: 0, stationFigures: 0 });
+    assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: ['birds', 'stationFigures'], worldCoreKeys: [] }), { birds: 0, stationFigures: 2 });
+    inPage(d, applyHideSetsInPage, { requested: [], worldCoreKeys: [] });
+    assert.ok(world.stationTravelers.every(traveler => traveler.figure.visible));
     const [water, waterfall] = world.group.children.filter(child => child.isMesh && child.material.uniforms && !child.material.uniforms.uColor);
     assert.ok(water.material.uniforms.uHeight && waterfall.material.side === THREE.DoubleSide);
     assert.deepEqual(inPage(d, applyHideSetsInPage, { requested: ['water', 'clouds', 'balloon'], worldCoreKeys: [] }), { water: 2, clouds: 33, balloon: 1 });

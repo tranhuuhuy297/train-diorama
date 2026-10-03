@@ -34,7 +34,7 @@ function fakeDiorama(time) {
 describe('water, cloud and balloon shots', () => {
   test('ten strict forest-stage shots stepped to sim time 10.05 s', () => {
     assert.deepEqual(validateShotList(), []);
-    assert.equal(ACTIVE_PARITY_STAGE, 'residents-and-forest');
+    assert.equal(ACTIVE_PARITY_STAGE, 'full-scene');
     const rows = [
       ['overview-zoomed-day-masked', 'day', ZOOMED], ['overview-zoomed-night-masked', 'night', ZOOMED],
       ['overview-day-waterfall-roi', 'day', null], ['balloon-closeup-day', 'day', BALLOON_VIEW], ['balloon-closeup-night', 'night', BALLOON_VIEW],
@@ -45,7 +45,7 @@ describe('water, cloud and balloon shots', () => {
       const shot = byId(id);
       assert.deepEqual([shot.stage, shot.timeOfDay, shot.seconds * 60, shot.thresholdClass, shot.fresh, shot.reportOnly, shot.camera],
         ['residents-and-forest', timeOfDay, 600, 'deterministic', true, false, camera], id);
-      const hidden = ['birds', 'stationFigures', 'puffs', 'sparks', ...(id.startsWith('waterfall-closeup') ? ['clouds'] : [])];
+      const hidden = ['puffs', 'sparks', ...(id.startsWith('waterfall-closeup') ? ['clouds'] : [])];
       assert.deepEqual(expandHideSets(shot.hide), hidden, id);
     }
     assert.deepEqual(byId('overview-day-waterfall-roi').regions, ['waterfall']);

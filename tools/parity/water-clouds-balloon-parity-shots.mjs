@@ -1,6 +1,6 @@
 // Water, cloud and balloon shots: the zoomed overview, a waterfall crop of the settled overview, and
 // close-ups of the balloon, the pond/river surface and the waterfall, each by day and night. Stepped
-// 600 frames (sim time 10.05 s) with the systems the clone still lacks and the transients hidden.
+// 600 frames (sim time 10.05 s) with the transients hidden.
 // Id aliases: overview-zoomed-night/-day -> the *-masked rows below (unmasked ids stay FULL-stage);
 // overview-day-default/overview-night-default -> overview-day-settled-masked/overview-night-masked.
 import { shot, ZOOMED } from './parity-shot-factory-and-camera-poses.mjs';
@@ -13,7 +13,7 @@ export const WATER_VIEW = Object.freeze({ position: [-4, 24, 18], target: [-2, 0
 // In front of the curtain below the board's front edge (the low cloud bank is hidden for this view).
 export const WATERFALL_VIEW = Object.freeze({ position: [0.3, -4, 96], target: [0.3, -9, 64] });
 
-const MASK = ['cloneMissing', 'transient'];
+const MASK = ['transient'];
 
 // [id, time of day, reference capture, extra settings]
 const ROWS = Object.freeze([
