@@ -1,8 +1,61 @@
 # Project changelog
 
-## [1.0.0] - 2026-10-03 — parity sign-off
+Versions 0.1.0–0.13.0 correspond to milestones 1–13 in `development-roadmap.md`; 1.0.0 is the
+full-scene parity sign-off (milestone 14). Milestones 1–8 were committed together as `a58995a`;
+milestones 9–14 have one commit each (`3a254ee`, `97d4611`, `50a5987`, `b46790e`, `98e83b2`,
+`f61bc3c`, all 2026-10-03).
 
-chore(release): full-scene parity sign-off, performance budget, final docs and deployment prep.
+## Documentation pass - 2026-10-04 (no code change, version stays 1.0.0)
+
+docs: CLAUDE.md, technique catalogue, build history and prompt log; repository private; GitHub Pages removed.
+
+### Changed
+- The GitHub repository `tranhuuhuy297/train-diorama` was made private and the GitHub Pages site was
+  removed; `.github/workflows/deploy-pages.yml` is deleted. The project is not published anywhere and
+  runs locally with `npm run dev`; `vercel.json` and `.vercelignore` stay for an optional static-host
+  deploy.
+- README: no live-demo line or Pages section; status complete; a gallery of all 7 screenshots;
+  References (traindiorama.netlify.app first, train-diorama.vercel.app, independence and
+  non-affiliation note); a Documentation index.
+- `index.html`: the analytics comment names "static hosts" instead of GitHub Pages (no behaviour
+  change; the insights script still loads only on `*.vercel.app`).
+- Screenshots: `overview-day`, `overview-evening`, `overview-night` and `overview-pixel-art`
+  re-captured from the final build; new `train-camera`, `bridge-camera` and `bridge-camera-night`
+  (1280 × 720 JPEG).
+- Every existing doc re-verified against the final code: `system-architecture.md` consolidated by
+  subsystem instead of by build order; `codebase-summary.md` re-counted (245 code files, 21,395
+  lines) with feature traceability by feature name; `code-standards.md`, `parity-testing-guide.md`
+  (shot catalogue re-counted from the code: 84 capture shots, 28 sign-off shots),
+  `design-guidelines.md`, `development-roadmap.md` (all 14 milestones complete, next steps) and
+  `project-overview-pdr.md` refreshed; `deployment-guide.md` rewritten for local use and optional
+  static hosting. Plan-only references (phase numbers, rule and finding ids) were replaced by the
+  facts they stood for.
+
+### Added
+- `CLAUDE.md`: operating manual for Claude Code in this repo (commands, folder map, architecture in
+  15 lines, hard rules, parity workflow, git conventions, environment gotchas, docs index).
+- The technique catalogue: `docs/diorama-techniques.md` (index, cheat sheet, anatomy of one frame
+  and of the build) with 14 technique chapters in `docs/techniques/` (what each technique does,
+  exact numbers, files, cost, pitfalls).
+- `docs/how-it-was-built.md`: the multi-agent method that built this repo (timeline, workflow
+  scripts, prompts, costs, incidents and lessons).
+- `docs/prompt-log/`: the owner's prompts verbatim, the original Workflow scripts as they ran, and
+  process facts (setup, runs, final numbers, incidents) in its README.
+- Screenshots `docs/images/train-camera.jpg`, `bridge-camera.jpg`, `bridge-camera-night.jpg`.
+
+### Verified
+- `npm test` 296 pass, `npm run test:parity` 79 tests pass (≈ 75 s on an idle machine; the
+  build-time case skips under `PARITY_SKIP_PERF=1`), `npm run check:lines` OK (245 files, max 199
+  lines).
+
+### Known follow-ups
+- `.vercelignore` does not list `CLAUDE.md`; add it before any Vercel deploy so agent notes never ship.
+- The README controls table does not list L (logs the current camera pose to the console).
+
+## [1.0.0] - 2026-10-03 — parity sign-off (commit `f61bc3c`)
+
+`feat: add full-scene parity sign-off, performance budget and docs`: the release gate, performance
+budget, final docs and deployment prep.
 
 ### Added
 - `tests/parity/full-scene-signature-parity.test.mjs`: the whole scene against the original oracle —
@@ -18,8 +71,9 @@ chore(release): full-scene parity sign-off, performance budget, final docs and d
 - `parity:perf` (BUILD and CPU-submit medians from loader marks and the inverted EMA, CDP heap
   sampling with app-frame attribution), `parity:research` (staged research recapture, palette overlap,
   contact sheet) and `parity:smoke` (local and deployed smoke checks, analytics and excluded paths).
-- `tools/parity/parity-metrics-math.mjs` with its unit test; `tests/unit/hud-right-click-reset-to-defaults.test.mjs`
-  (covering test for the right-click resets); `docs/deployment-guide.md`.
+- `tools/parity/parity-metrics-math.mjs` with its unit test;
+  `tests/unit/hud-right-click-reset-to-defaults.test.mjs` (covering test for the right-click resets);
+  `docs/deployment-guide.md`.
 - `tools/static-dev-server.mjs`: `--root` and `--port` options (pinned-original fallback serve).
 
 ### Changed
@@ -38,8 +92,8 @@ chore(release): full-scene parity sign-off, performance budget, final docs and d
   the Pages workflow and `README.md`.
 - `compare-parity-shots.mjs` moved its PNG diff code to `png-diff-in-page.mjs`; sign-off helpers live
   in `signoff-*.mjs` modules so every tool stays under 200 lines.
-- Docs finalised: architecture (consolidated contracts mirror, hook, dependency graph, data flow),
-  codebase summary (module index, files outside the unified tree, 147-row traceability), parity guide
+- Docs finalised: architecture (consolidated cross-module view, hook, dependency graph, data flow),
+  codebase summary (module index, support files, 147-row traceability), parity guide
   (sign-off results), roadmap (post-parity backlog), PDR, design guidelines, code standards, README.
 - Sign-off compares exclude masked pixels (the union of both sites' `maskRects`, measured at capture)
   from both the numerator and the denominator; a masked shot without rects fails. A sign-off shot with
@@ -59,10 +113,13 @@ chore(release): full-scene parity sign-off, performance budget, final docs and d
 
 ### Fixed
 - No drift fixes were needed: every sign-off layer matched on the first run.
+- The performance gate passed with zero samples (`null <= 1.1 * null` is `true` in JS): every perf
+  verdict now checks `Number.isFinite` first, covered by `tests/unit/parity-metrics-math.test.mjs`.
 
-## [0.13.0] - 2026-10-03
+## [0.13.0] - 2026-10-03 (commit `98e83b2`)
 
-feat(life): station travelers (walking old man with cane, waiting grandmother) and bird flocks on perches.
+`feat: add station travelers, bird flock and perches`: a walking old man with a cane, a waiting
+grandmother and bird flocks on perches.
 
 ### Added
 
@@ -108,9 +165,10 @@ feat(life): station travelers (walking old man with cane, waiting grandmother) a
   `runtime-counts-probe.mjs` judges scenario sections through `scenario-probe-sections.mjs`.
   The clone's frozen default now equals the original: 1373 / 1,762,696 / 419 / 6 / 25.
 
-## [0.12.0] - 2026-10-03
+## [0.12.0] - 2026-10-03 (commit `b46790e`)
 
-feat(world): pond/river water, waterfall, drifting cloud field with camera avoidance, hot-air balloon.
+`feat: add water, waterfall, cloud field and hot-air balloon`: pond/river water, the waterfall, a
+drifting cloud field with camera avoidance and the hot-air balloon.
 
 ### Added
 
@@ -149,15 +207,16 @@ feat(world): pond/river water, waterfall, drifting cloud field with camera avoid
   name their regions explicitly. Earlier tests follow (residents/forest suite compares full builds;
   shot/preset pins updated).
 
-## [0.11.0] - 2026-10-03
+## [0.11.0] - 2026-10-03 (commit `50a5987`)
 
-feat(life): sheep flock with pasture grazing, sleep, and the rail sheep that hop clear of the train.
+`feat: add pasture and trackside sheep flock`: pasture grazing, sleep, and the rail sheep that hop
+clear of the train.
 
 ### Added
 
 - `src/life/sheep/`: `createSheepInstancedMeshes` (body = fleece + head + tail, legs, ears; three
   instanced layers of 27 / 108 / 54 over one npr material), `sheepGroundAt` (pasture mask + slope
-  normal, also `World#sheepGroundAt`), `spawnPastureSheep` (24 sheep, W5b draw order),
+  normal, also `World#sheepGroundAt`), `spawnPastureSheep` (24 sheep, `world.rand` right after the rocks),
   `findTracksideFlockSite` / `createTrackSheep` (clearing score, three routes, r1.2 clearings,
   `No safe trackside sheep clearing`), `buildSheepFlock`, `TRACK_SHEEP_PRESETS` /
   `advanceTrackSheep` / `advanceTrackSheepFlock` (three.js-free state machine with the exact
@@ -183,9 +242,10 @@ feat(life): sheep flock with pasture grazing, sleep, and the rail sheep that hop
 - Earlier parity tests: the residents/forest suite compares the original's sheep layers and
   clearings (no more filters); unit fixtures follow the new preset and the probe's exclusion delta 0.
 
-## [0.10.0] - 2026-10-03
+## [0.10.0] - 2026-10-03 (commit `97d4611`)
 
-feat(camera): free-fly pointer-lock camera, train fly-along rig and bridge tripod.
+`feat: add free fly, train and bridge camera modes`: the free-fly pointer-lock camera, the train
+fly-along rig and the bridge tripod.
 
 ### Added
 
@@ -223,10 +283,10 @@ feat(camera): free-fly pointer-lock camera, train fly-along rig and bridge tripo
   Chromium rejects `lock(true)`, so real lock, Esc release and WASD flight are unverified in a
   real browser.
 
-## [0.9.0] - 2026-10-02
+## [0.9.0] - 2026-10-02, committed 2026-10-03 (commit `3a254ee`)
 
-feat(world): village residents with their walk cycle, the instanced forest with its canopy height
-grid, and the riverside rocks.
+`feat: add village residents, forest scatter with canopy grid, riverside rocks`: village residents
+with their walk cycle, the instanced forest with its canopy height grid, and the riverside rocks.
 
 ### Added
 
@@ -240,16 +300,16 @@ grid, and the riverside rocks.
 - Build steps 10–12: `createVillageResidents` (plus two r2.2 yard exclusions), `buildTrees`,
   `buildRocksAndSheep` (rocks only until the sheep flock lands).
 - `src/world/trees/`: `createTreeSpeciesGeometries` (conifer, round, cluster, bush; `TREE_TRUNK_COLOR`),
-  `scatterTrees` (`TREE_SCATTER_ATTEMPTS` 14000, W4 draw order, `TREE_TINTS`, `AUTUMN_TREE_TINT`,
+  `scatterTrees` (`TREE_SCATTER_ATTEMPTS` 14000 on `world.rand`, `TREE_TINTS`, `AUTUMN_TREE_TINT`,
   `BLOSSOM_TREE_TINT`), `buildTrees` (4 instanced layers, sway material for 0–2, still bush material,
   pushed into `world.treeLayers`), canopy grid (`CANOPY_CELL_SIZE` 2, `CANOPY_HALF` 70,
   `CANOPY_GRID_SIZE` 70, `createCanopyHeightGrid`, `stampCanopyHeights`, `treeCanopyHeightAt`).
 - `src/world/rocks/riverside-rock-scatter.js`: `buildRiversideRocks` (`ROCK_CAPACITY` 80,
-  `ROCK_ATTEMPTS` 3000, W5a draw order, no instance colour).
+  `ROCK_ATTEMPTS` 3000 on `world.rand`, no instance colour).
 - `World#treeCanopyHeightAt(x, z, radius)`; `updateWorld` slots 5 (residents update) and 6
   (resident log line).
 - Tests: `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` (walk-cycle table, canopy
-  grid edges, W4/W5a draw accounting on scripted stub worlds),
+  grid edges, tree and rock `world.rand` draw accounting on scripted stub worlds),
   `tests/unit/parity-forest-residents-shots-actions-and-probe.test.mjs`,
   `tests/parity/residents-trees-rocks-parity.test.mjs` (clone-only build + 8 log lines at the exact
   frames; original A/B/C: yards, tree buffers, geometries, materials, canopy grid, 10 000 canopy
@@ -258,10 +318,12 @@ grid, and the riverside rocks.
 - Parity tooling: stage `residents-and-forest` with shots `overview-day-settled-masked`,
   `overview-zoomed-orbited-masked` (new reference 12b), `overview-night-masked`,
   `village-residents-yard`, `trees-sway-t0`, `trees-sway-t1`, `trees-sway-hold` (all three always
-  `fresh`, so the t0 baseline never shares a page with a parked train), `trees-debug-hidden`; hide set `water` and preset `cloneMissing`; shot page actions
-  (`page-shot-actions.mjs`: `uniformTimeOffset`, `debugLayerOff`, `inPageCameraPose`,
-  `holdPausedFrames`); same-site shot relations and action checks in `parity:compare`
-  (`intra-site-shot-checks.mjs`); probe section `forest` (`forest-residents-runtime-probe.mjs`).
+  `fresh`, so the t0 baseline never shares a page with a parked train), `trees-debug-hidden`; hide
+  set `water` and preset `cloneMissing` (the systems the clone did not have yet, hidden alike on both
+  sites; retired in 0.13.0); shot page actions (`page-shot-actions.mjs`: `uniformTimeOffset`,
+  `debugLayerOff`, `inPageCameraPose`, `holdPausedFrames`); same-site shot relations and action
+  checks in `parity:compare` (`intra-site-shot-checks.mjs`); probe section `forest`
+  (`forest-residents-runtime-probe.mjs`).
 
 ### Changed
 
@@ -274,7 +336,24 @@ grid, and the riverside rocks.
   `debugLayerOff`, `inPageCameraPose` and `relation` (shots with page actions get their own page).
 - Clone frozen default: 1004 calls / 1,657,126 triangles / 360 geometries / 5 textures / 20 programs.
 
-## [0.8.0] - 2026-10-02
+## Housekeeping - 2026-10-02 (commits `2a51bd1`, `b2f151f`)
+
+docs: screenshots, references and a GitHub Pages deploy; ci: Node 24 action versions.
+
+### Added
+- README: day, evening, night and pixel-art screenshots in `docs/images/`, a status line, the
+  References section (traindiorama.netlify.app and train-diorama.vercel.app) and a live-demo link
+  (removed again on 2026-10-04).
+- `.github/workflows/deploy-pages.yml`: unit tests, then a static artifact with only `index.html`,
+  `src/`, `styles/` and `assets/` published to GitHub Pages (removed on 2026-10-04).
+
+### Changed
+- `index.html` loads the Vercel insights script only on `*.vercel.app` hosts (previously on every
+  non-local host), so other static hosts make no analytics request.
+- CI actions moved to Node 24 versions (checkout v7, setup-node v7, configure-pages v6,
+  upload-pages-artifact v5, deploy-pages v5).
+
+## [0.8.0] - 2026-10-02 (milestones 1–8 committed together as `a58995a`)
 
 feat(world): village cottages with chimney smoke and shrubs, and the windmill with hay bales and rotor.
 
@@ -369,9 +448,9 @@ feat(train): train model, station-stop motion, smoke puffs, brake sparks and hea
 - `stepCloneFrame` now matches `stepOriginalFrame` and the frame loop: it writes
   `world.nightAmount` from `uNight` first and steps the simulation only when not paused and
   timeScale > 0, at dt·timeScale (no effect on the existing daylight ×1 suites).
-- `stepSimulation` calls `updateTrain`, `world.update` and reads `train` unconditionally (contract
-  §5); a context without them now throws instead of silently skipping the step. The bare-context
-  unit case became a time/uTime-before-train ordering case plus the two throwing cases.
+- `stepSimulation` calls `updateTrain`, `world.update` and reads `train` unconditionally; a context
+  without them now throws instead of silently skipping the step. The bare-context unit case became
+  a time/uTime-before-train ordering case plus the two throwing cases.
 - The 120 s behaviour run's puff check (`live ≤ 70`, always true for a 70-record pool) is replaced
   by spec-formula checks in `tests/helpers/smoke-puff-behaviour-checks.mjs`: emission gaps, a
   2.4–3.6 s lifetime window on live counts and the cruise steady state.
@@ -436,7 +515,7 @@ feat(world): Mossbrook station.
 - Terrain: river distance and natural height, graded heightmap with a cached per-vertex
   nearest-track grid (Float64 distances; built lazily when grading is skipped), rotated building
   pads, vertex-coloured surface with the FLOWERS material, strata skirt (`topY`), wooden plinth
-  and the R8 `heightTex`.
+  and the 8-bit `heightTex` read by the water shader.
 - Track and bridge: centripetal spline frames + Float32 `sx`/`sz`, ballast and rail extrusions,
   383 instanced sleepers; bridge span [30, 178], deck/side girders, handrails, 76 instanced posts,
   chord-plane arch ribs, 20 spandrel columns, 7 braces, 8 approach piers, 2 stone abutments.
@@ -511,9 +590,9 @@ feat(world): Mossbrook station.
 
 ### Added
 
-- Real `Diorama` engine (`engine/diorama.js`), replacing the P01 facade at the same path and
-  public surface: `WebGLRenderer` (antialias off, pixel ratio ≤ 2, linear colour space), the
-  constructor fields Phase 10 later consumes (`autoRotateEnabled`, `raf`, fly-along vectors,
+- Real `Diorama` engine (`engine/diorama.js`), replacing the non-rendering facade at the same path
+  and public surface: `WebGLRenderer` (antialias off, pixel ratio ≤ 2, linear colour space), the
+  constructor fields the camera rigs consume (`autoRotateEnabled`, `raf`, fly-along vectors,
   `tmpA`/`tmpB`, `loop`), `logCameraPose`, `dispose`.
 - 120fps-capped frame loop (`engine/frame-loop-scheduler.js`) and `engine/simulation-step.js`:
   every per-frame member is read from the instance at call time (never cached/bound), so a
@@ -522,7 +601,7 @@ feat(world): Mossbrook station.
   day/evening/night, written in place into the shared uniform bag, `uLightDir` renormalised
   every step.
 - Procedural sky dome (`materials/procedural-sky-dome-material.js`): gradient, sun/moon glow and
-  disc, stars, 3 ridge hill bands, mist — written fresh from the engine phase's formula tables.
+  disc, stars, 3 ridge hill bands, mist — written fresh from formula tables.
   Night-glow registry (`engine/night-light-glow-registry.js`).
 - Custom 2048² shadow depth pass (`engine/custom-shadow-depth-pass.js`) and the post pass
   (`engine/post-ink-outline-dither-pass.js`): depth-Laplacian ink outline, saturation, film grain
@@ -571,8 +650,8 @@ feat(world): Mossbrook station.
   guards) and `tools/check-file-line-limits.mjs` (200-line budget gate).
 - Original logo (`assets/train-diorama-logo.svg`) and favicon (`assets/clock-favicon.svg`), hand
   authored from the design-guidelines spec.
-- Page shell `index.html`: full DOM per the shell/HUD contract, import map pinned to
-  `three@0.186.0`, Fredoka font, Vercel analytics stub (non-local hosts only).
+- Page shell `index.html`: the full 22-id DOM, import map pinned to `three@0.186.0`, Fredoka font,
+  Vercel analytics stub (non-local hosts only).
 - Hand-written utility CSS across 5 files, reproducing the original's cascade-layer ordering so
   unlayered component rules win over Tailwind-style utilities.
 - Settings persistence (`ui/settings-schema-defaults.js`,
@@ -584,7 +663,7 @@ feat(world): Mossbrook station.
   (`ui/keyboard-shortcuts.js`).
 - Weighted loading screen runner (`ui/loading-screen-step-runner.js`) and boot wiring
   (`src/main-entry.js`).
-- A non-rendering `Diorama` facade stub (`src/engine/diorama.js`) implementing the UI contract.
+- A non-rendering `Diorama` facade stub (`src/engine/diorama.js`) implementing the UI-facing API.
 - Unit tests for settings persistence, keyboard shortcut resolution and the loading runner
   (29 scenarios, `node --test`).
 - This documentation skeleton.

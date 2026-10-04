@@ -7,13 +7,18 @@ by behaviour: no code, markup, shaders or artwork from the original are included
 used only as a local black-box test oracle. The logo and favicon in `assets/` are this repository's
 own original artwork.
 
-**Live demo:** https://tranhuuhuy297.github.io/train-diorama/ · release 1.0.0 (full-scene parity sign-off)
+Release 1.0.0 (full-scene parity sign-off). The repository is private and the site is not published:
+run it locally (see Quick start).
 
 ![Train Diorama: overview, day](docs/images/overview-day.jpg)
 
 | Evening | Night | Pixel art (360p) |
 |---|---|---|
 | ![Evening](docs/images/overview-evening.jpg) | ![Night](docs/images/overview-night.jpg) | ![Pixel art](docs/images/overview-pixel-art.jpg) |
+
+| Train camera | Bridge camera | Bridge camera, night |
+|---|---|---|
+| ![Train camera](docs/images/train-camera.jpg) | ![Bridge camera](docs/images/bridge-camera.jpg) | ![Bridge camera at night](docs/images/bridge-camera-night.jpg) |
 
 **Status:** complete. Terrain, track, bridge, station, village, windmill, steam train, time of day,
 ink lines, pixel art, village residents, forest, rocks, the Free / Train / Bridge cameras, sheep,
@@ -59,6 +64,7 @@ existing Chrome/Chromium binary (then install with `PLAYWRIGHT_SKIP_BROWSER_DOWN
 
 ```
 index.html            page shell, import map, fonts, analytics stub
+CLAUDE.md              operating manual for Claude Code in this repo
 styles/                hand-written CSS (cascade-layer design mirrors the reference exactly)
 src/main-entry.js      boot sequence
 src/ui/                settings, HUD rendering/actions/bindings, keyboard shortcuts, toast, loader
@@ -74,15 +80,33 @@ tools/                 dev server, line-count gate, parity source fetcher, brows
 tests/unit/            node:test unit + oracle-parity suites
 tests/parity/          heavier node parity suites (npm run test:parity)
 tests/helpers/         oracle access, DOM shim, original World stepper, simulation oracle + clone driver, scene signatures
-docs/                  project documentation (architecture, codebase summary, parity guide, deployment guide)
+docs/                  project documentation, technique catalogue, build history, prompt log; docs/images/ screenshots
 ```
+
+## Documentation
+
+| Doc | Content |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Operating manual for Claude Code: commands, folder map, hard rules, gotchas |
+| [`docs/project-overview-pdr.md`](docs/project-overview-pdr.md) | Goal, fixed decisions, parity acceptance criteria and status |
+| [`docs/system-architecture.md`](docs/system-architecture.md) | Module graph, boot and frame order, every subsystem |
+| [`docs/codebase-summary.md`](docs/codebase-summary.md) | Module index and the 147-feature traceability table |
+| [`docs/code-standards.md`](docs/code-standards.md) | Independence, file rules, style, tests, parity-critical rules, git |
+| [`docs/design-guidelines.md`](docs/design-guidelines.md) | Style bible, HUD and loader tokens, logo spec |
+| [`docs/parity-testing-guide.md`](docs/parity-testing-guide.md) | Parity harness, determinism rules, sign-off results |
+| [`docs/development-roadmap.md`](docs/development-roadmap.md) | Milestone history and the post-parity backlog |
+| [`docs/project-changelog.md`](docs/project-changelog.md) | Changes per release |
+| [`docs/deployment-guide.md`](docs/deployment-guide.md) | Local use and optional static deploy |
+| [`docs/diorama-techniques.md`](docs/diorama-techniques.md) | Technique catalogue (14 chapters in `docs/techniques/`) |
+| [`docs/how-it-was-built.md`](docs/how-it-was-built.md) | The Claude Code multi-agent method, costs and incidents |
+| [`docs/prompt-log/README.md`](docs/prompt-log/README.md) | The prompts and the original Workflow scripts as they ran |
 
 ## Deploy
 
-GitHub Pages deploys `main` through `.github/workflows/deploy-pages.yml` (unit tests, then a static
-artifact with only `index.html`, `src/`, `styles/` and `assets/`). Vercel is configured (`vercel.json`:
-no install, no build, output = repo root; `.vercelignore`) but deploys only on explicit approval; see
-[`docs/deployment-guide.md`](docs/deployment-guide.md).
+Not published: the repository is private and the scene runs locally with `npm run dev`. The site
+is plain static files (`index.html`, `src/`, `styles/`, `assets/`), so any static host can serve it; a Vercel
+configuration (`vercel.json`: no install, no build, output = repo root; `.vercelignore`) is kept for
+an optional deploy on explicit approval. See [`docs/deployment-guide.md`](docs/deployment-guide.md).
 
 ## Parity source cache
 

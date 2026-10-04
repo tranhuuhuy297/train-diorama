@@ -87,7 +87,7 @@
 
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  // The insights endpoint only exists on Vercel deployments; other hosts (local, GitHub Pages) skip it.
+  // The insights endpoint only exists on Vercel deployments; other hosts (local, static hosts) skip it.
   if (location.hostname.endsWith('.vercel.app')) {
     const insightsScript = document.createElement('script');
     insightsScript.src = '/_vercel/insights/script.js';

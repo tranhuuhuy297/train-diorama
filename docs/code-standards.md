@@ -1,166 +1,192 @@
 # Code standards
 
-## Independence (D0)
+Rules this codebase follows, with the reason for each. The parity-specific rules exist because the
+reference implementation is used as an oracle.
 
-This is an independent, from-scratch implementation. Never paste, adapt or lightly edit text from
-the reference site's JS/CSS/HTML/SVG; it is used only as a black-box test oracle
-(`.parity-cache/`, gitignored, never imported by `src/`). Code comments never cite the
-reference's files or line numbers — only this repo's own modules/symbols, or stable external
-identifiers (RFC numbers, SQLSTATE codes, CVE ids) may be referenced.
+## 1. Independent implementation
 
-Allowed as-is, because they are facts or open vocabulary, not expression: DOM ids, Tailwind
+This is an independent, from-scratch implementation of a reference that has no licence. Never paste,
+adapt or lightly edit text from the reference site's JS, CSS, HTML, GLSL or SVG; it is used only as
+a black-box test oracle (`.parity-cache/`, gitignored, never imported by `src/`). Code comments never
+cite the reference's files or line numbers; they may name only this repo's own modules and symbols or
+stable external identifiers.
+
+Allowed as-is, because they are facts or open vocabulary rather than expression: DOM ids, Tailwind
 utility class names, short UI strings (labels, toasts, console logs, error messages), the storage
-key, standard three.js API idioms, and standard algorithms described in our own words (mulberry32,
-hashes, value/gradient noise, smoothstep, Bayer dithering).
+key, standard three.js API idioms, numeric values and option tables, and standard algorithms written
+in our own words (mulberry32, hashes, value/gradient noise, smoothstep, Bayer dithering). New code is
+written from behavioural specs (parameter tables, formulas, algorithm descriptions, API contracts),
+never from the reference's text.
 
-Gate before every commit that touches `index.html`, `styles/`, `src/`, `tools/` or `tests/`:
+Gate before every commit that touches `index.html`, `styles/`, `src/`, `tools/` or `tests/`. The
+two independence checkers live outside the repo, in the research folder that `PARITY_RESEARCH_DIR`
+points to:
+
+```bash
+python3 "$PARITY_RESEARCH_DIR/verbatim-overlap-check.py" "$PARITY_RESEARCH_DIR/.." <changed files>
 ```
-python3 <plan-dir>/research/verbatim-overlap-check.py <plan-dir> <changed files>
-```
-Every reported chunk must be a single declaration, URL or UI string fully dictated by a value in
-the relevant phase file; anything else gets rewritten.
 
-Before a release, run the whole independence audit (commands and allowance table in
-`parity-testing-guide.md`, "Independence audit"): the overlap checker over every tracked file, the
-structural-similarity checker (no file above 0.30 except the DOM-dictated `index.html`), the
-file:line citation grep, the SVG hash comparison, and `git ls-files .parity-cache .parity-output`
-(must print nothing). Write new code from the phase's tables and prose, never from the original's
-text; when an audit hit falls outside the allowances, rewrite the passage in its owning module and
-rerun that module's parity tests.
+Every reported chunk must be a single declaration, URL or UI string fully dictated by a value in the
+spec; anything else is rewritten. Before a release, run the whole independence audit (commands and
+allowance table in `parity-testing-guide.md`, "Independence audit" under "Release sign-off (1.0.0)"): the overlap checker over every tracked
+file, the structural-similarity checker (no JS/CSS file above 0.30; `index.html` is exempt because its
+DOM ids, classes and labels are dictated), the file:line citation grep, the SVG hash comparison, and
+`git ls-files .parity-cache .parity-output` (must print nothing). When an audit hit falls outside the
+allowances, rewrite the passage in its owning module and rerun that module's parity tests.
 
-## File rules (R1–R12 digest)
+Why: an earlier spec draft transcribed the reference verbatim (433 overlapping chunks); an implementer
+correctly refused to build from it. Specs as tables and prose plus the two checker scripts fixed it.
 
-- **R1 Runtime:** vanilla ESM, no bundler; `three@0.186.0` via import map; Node tests resolve the
-  same bare specifier from the `three` devDependency.
-- **R2–R9:** engine/world/material parity rules that apply once those modules exist (see
-  `system-architecture.md`; full detail lives in the plan's cross-module contracts, which are not
-  duplicated here to avoid drift).
-- **R10 Console strings:** exactly as specified per phase; no incidental extra output.
-- **R11 Size & naming:** every code file stays under 200 lines; kebab-case filenames; short
-  one-line comments that state the *why*, not a restatement of the code.
-- **R12:** output-identical refactors (module splits, caching, scratch-object reuse) are always
-  allowed as long as observable behaviour is unchanged.
+## 2. File rules
 
-## Style
+| Rule | Detail | Why |
+|---|---|---|
+| Runtime | Vanilla ESM, no bundler; `three@0.186.0` via the import map; node tests resolve the same bare specifier from the `three` devDependency | build-free deploy; identical module graph in browser and tests |
+| Size | Every code file stays under 200 lines (`npm run check:lines`, 245 files, max 199) | small files are easy for agents and reviewers to read whole; splits are named for what they hold |
+| Naming | kebab-case, descriptive file names (`track-sheep-escape-state-machine.js`, not `sheep2.js`) | a file name tells an agent what it holds without opening it |
+| Comments | short, one line, state the *why*; never reference plans, phases, finding ids or the reference's files | comments outlive plans |
+| Exports | named exports only, no default exports | call sites stay greppable |
+| Side effects | only `src/main-entry.js` touches the DOM or globals at module evaluation (plus the colour-management side-effect module); `src/ui/*` touches no DOM at import | every module imports cleanly under `node --test` |
+| Console output | exact strings per subsystem (`[CAMERA]`, `[SHEEP]`, …); no incidental extra output; `[PARITY]` only behind the hook | log sequences are compared between sites |
+| Refactors | output-identical refactors (module splits, caching, scratch-object reuse, a registry instead of inline calls) are always allowed when observable behaviour is unchanged | keeps structure free while parity stays provable |
+| Validation | plain JS with no type system; validate at the boundary (e.g. all-or-nothing settings validation) | one place to reason about bad input |
 
-- Named exports only (no default exports) — keeps call sites self-documenting under Grep/Search.
-- No DOM access at module evaluation time in `src/ui/*`; only `src/main-entry.js` has top-level
-  side effects, so every UI module imports cleanly under `node --test`.
-- Prefer small pure functions (e.g. `resolveKeyAction`) that are easy to unit test without a DOM.
-- `any`-shaped escapes are not applicable (plain JS, no type system); keep inputs validated at the
-  boundary instead (see `settings-local-storage-persistence.js`'s all-or-nothing validation).
+## 3. Parity-critical rules
 
-## Tests
+These rules decide whether outputs stay bit-identical to the oracle. Breaking one usually shows up as
+a node lockstep mismatch long before anything looks wrong.
 
-- `npm test` = `node --test "tests/unit/**/*.test.mjs"` (unit + cache-gated oracle cases that are
-  cheap); `npm run test:parity` = `node --test --test-concurrency=1 "tests/parity/*.test.mjs"`
-  (heavier original-World suites, one process at a time). Files are named `*.test.mjs`; test
-  names describe a scenario ("absent key returns a fresh defaults clone"), not a phase or finding id.
-- Fakes are minimal, purpose-built stand-ins (a `Map`-backed storage, a DOM-free `EventTarget`
-  pair for `window`/`document`), never a full DOM library — keeps intent visible and runtime fast.
-- `node:test`'s mock timers (`t.mock.timers` / `test.mock.timers`) drive `setTimeout`/
-  `setInterval`; `requestAnimationFrame` is a tiny manual queue flushed explicitly, since it is not
-  covered by `mock.timers`.
+- **Float-exact operand order.** Keep each formula's grouping exactly as specified, left to right
+  unless bracketed: doubles are not associative, and accept/reject decisions in placement code
+  change how many PRNG draws are consumed. `Math.hypot` vs `√(Σx²)`, `**` vs repeated products and
+  iterated products vs `pow` differ in the last bit; use the stated form.
+- **Float32 storage points.** Round to Float32 exactly where the reference stores Float32 (heights,
+  `sx`/`sz`, canopy heights, instance buffers) and nowhere else.
+- **Three smoothstep flavours.** Core `smoothstep(a, b, x)` (reversed edges allowed, used by
+  world-side code), `THREE.MathUtils.smoothstep(x, min, max)` (birds, walker, residents) and
+  `THREE.MathUtils.smootherstep` (building pads). Using the wrong one changes bits or shapes. Never
+  "fix" a reversed-edge core call. In GLSL, reversed-edge uses (sky mist, waterfall splash) are written
+  as `1 − smoothstep(lo, hi, x)` because GLSL `smoothstep` is undefined for `edge0 > edge1`.
+- **`npr()` option literals** keep the reference call site's keys, key order and values: the cache
+  key is `JSON.stringify(options)`, so a reordered or normalised literal creates a distinct material,
+  which shifts merge batches, draw calls and the `material.id` sort order.
+- **Material creation order** is part of the output: the renderer's opaque sort breaks ties by
+  `material.id`, so palettes are created in a fixed table order.
+- **Never `.clone()` a `ShaderMaterial`**, and never reassign a key on `G`, `NIGHT_UNIFORMS`,
+  `SHADER_NIGHT_UNIFORMS` or `LIGHTING_UNIFORMS` (all frozen; reassigning throws). Both would break
+  the shared-uniform-by-reference model.
+- **Allocation order.** Every `Object3D`, geometry, material, texture and source draws 4
+  `Math.random` values for its UUID; allocate in the reference's order and do not add helper groups,
+  clones or module-scope scene objects. No three.js allocation per frame.
+- **Scene insertion order** is part of the output (glow collection order, shadow-hidden list,
+  transparent tie-breaks, merge batch order).
+- **Never reorder world build steps**; `world.rand` is consumed in step order.
+- **Scalar-helper substitutions** (`wrapAngle`, `positiveModulo`, `exponentialResponse`) may replace
+  an inline expression only when exact:
+  - `wrapAngle(h − r)` replaces `atan2(sin(h − r), cos(h − r))` (walker, bird and resident heading).
+  - `positiveModulo(x, L)` replaces `((x % L) + L) % L`, including `(((s / L) % 1) + 1) % 1` →
+    `positiveModulo(s / L, 1)`.
+  - `exponentialResponse(dt, r)` replaces `1 − exp(−dt · r)` only when `r` is a single operand or
+    fully parenthesised. Never collapse a three-factor exponent `−dt · a · b` (it evaluates as
+    `((−dt) · a) · b`), and never replace the cloud-return `exp(−CLOUD_RETURN_RESPONSE · dt)`
+    (rate-first, a different form).
+- **GLSL is judged by interface and output**, never by text: uniform/attribute/`#ifdef`/function
+  signatures via `extractGlslInterface`, and rendered pixels.
+- **Parity tests restore any global `.value` they mutate** in a `finally` block: the uniform bag and
+  the `npr()` cache are process-global.
 
-## Parity harness conventions
+## 4. Engine conventions
+
+- **Instance dispatch.** The frame loop and `stepSimulation` read `updateTimeOfDay`, `updateCamera`,
+  `updateTrain`, `world`, `birds`, `world.updateCloudCamera` and `render` from the diorama instance
+  every frame: never cached, bound or destructured. The capture freeze swaps no-ops onto the instance;
+  caching a reference would silently disable them on the clone only. The calls are unguarded so a
+  diorama without its world or train fails at the cause.
+- **Registries over inline calls.** World construction is an ordered, named registry
+  (`WORLD_BUILD_STEPS`) and the per-frame update is a fixed slot list (`updateWorld`), so tests can
+  stop, skip or wrap a step and a new system has exactly one insertion point.
+- **Pure state machines.** Behaviour with branching (train motion, rail sheep, bird flocks) lives in
+  three.js-free modules that take a snapshot and return the next state, so it is unit-testable and
+  fuzzable against the oracle.
+- **Scratch objects.** Per-frame code reuses module-level or world-owned scratch vectors
+  (`world.sheepTransforms`, `computeFlockSnapshot`'s `target`), never `new` per frame.
+
+## 5. Tests
+
+- `npm test` = `node --test "tests/unit/**/*.test.mjs"` (296 tests: unit plus cheap cache-gated oracle
+  cases); `npm run test:parity` = `node --test --test-concurrency=1 "tests/parity/*.test.mjs"` (79
+  heavier oracle tests, one process at a time, ≈ 80 s on an idle machine). Files are named `*.test.mjs`; test names
+  describe a scenario ("absent key returns a fresh defaults clone"), never a phase or finding id.
+- Scratch files live in `/tmp`, never in the repo: a stray `*.test.mjs` would be picked up.
+- Fakes are minimal purpose-built stand-ins (a `Map`-backed storage, a DOM-free `EventTarget` pair,
+  a recording 2D canvas), never a full DOM library.
+- `node:test` mock timers drive `setTimeout`/`setInterval`; `requestAnimationFrame` is a tiny manual
+  queue flushed explicitly.
+- Oracle-dependent tests are gated with `{ skip: originalSkipReason([...]) }`, so a missing cache
+  reports a skip with `run npm run parity:fetch`, never a failure.
+- Golden values that equal the oracle's (FNV-1a hashes of output arrays, layout scalars) live in
+  `npm test` so they hold without the cache.
+
+## 6. Parity harness conventions
 
 - **`[PARITY]` output only behind the hook.** `installParityTestHook` is the single source of
-  `[PARITY]` console lines and of `window.__diorama` / `window.__parityBuildInfo`; without the
-  `parity` query param nothing is exposed or logged. CLI progress output is plain text.
-- **Per-frame dispatch through instance members.** The frame loop and `stepSimulation` call
-  `d.updateTimeOfDay`, `d.updateCamera`, `d.updateTrain`, `d.world.…`, `d.render` on the instance
-  every frame — never cached, bound or destructured — so the capture freeze can swap no-ops onto
-  the instance. The calls are unguarded: a Diorama without its train or world fails at the cause.
+  `[PARITY]` lines and of `window.__diorama` / `window.__parityBuildInfo`. CLI progress is plain text.
 - **CLIs guard `main()`:** a `tools/parity/*.mjs` CLI runs only when its module URL equals
-  `pathToFileURL(process.argv[1])`, so tests import its pure parts (`computeDiffMetrics`,
-  `diffProbeResults`, …) without side effects.
-- **Shots are gated by descriptive stage names** (`shell-and-sky`, `train`, `village-and-windmill`, `full-scene`), never
-  by plan numbers; advance `ACTIVE_PARITY_STAGE` when a stage's features land.
-- **Test helpers never modify the original modules on disk.** Partial original builds patch
+  `pathToFileURL(process.argv[1])`, so tests import its pure parts without side effects.
+- **Shots are gated by descriptive stage names** (`shell-and-sky`, `train`, `village-and-windmill`,
+  `residents-and-forest`, `full-scene`); `ACTIVE_PARITY_STAGE` is `full-scene`.
+- **Helpers never modify the original modules on disk.** Partial original builds patch
   `World.prototype` in memory for one construction and restore every patched method in `finally`;
   the original site is patched only inside the Playwright test browser.
 - **Research paths resolve in one place:** `resolveResearchDir()` in
-  `tools/parity/parity-shot-list.mjs` (`PARITY_RESEARCH_DIR` override); nothing else hard-codes it.
-- **Independent implementation:** no text copied from the original; no original file:line
-  citations in code comments (see the Independence section).
+  `tools/parity/research-capture-paths.mjs` (re-exported by `parity-shot-list.mjs`;
+  `PARITY_RESEARCH_DIR` override).
+- **Numeric gates guard against empty samples:** `null <= 1.1 * null` is `true` in JS, so every perf
+  verdict checks `Number.isFinite` first (a zero-sample run once passed the gate).
 
-## D8: tool-path hygiene
-
-Local tooling (and the shell hooks that gate it) blocks any *command text* containing a
-`node_modules`/`dist`/`build`/`vendor`/`coverage`/`target`/`.git` path segment. This never applies
-to file *contents* — `tools/static-dev-server.mjs` and `.gitignore` legitimately contain the
-literal string `node_modules`, since they are the constants those tools act on, never a path typed
-into a shell command.
-
-## Parity-critical rules (materials, noise, merge — from P02)
-
-- **D0 independence applies to GLSL too:** shaders are written fresh from each phase's formula
-  tables, never adapted from the oracle's source. Parity for GLSL is judged on *interface*
-  (uniform/attribute/`#ifdef`/`COMMON` function names+types, via `extractGlslInterface`) and on
-  rendered GPU output, never on shader text.
-- **R5 float-exact operand order:** keep each formula's grouping exactly as the phase table states
-  it (left to right unless bracketed) — JS/GLSL doubles are not associative, and placement/visual
-  code downstream depends on bit-identical results.
-- **R6 smoothstep flavours:** there are three distinct functions in this codebase (core
-  `smoothstep(a,b,x)`, `THREE.MathUtils.smoothstep(x,min,max)`, `THREE.MathUtils.smootherstep`);
-  using the wrong one changes bits or shapes. Never "fix" a reversed-edge call to the core JS
-  `smoothstep(a,b,x)` (`a > b`) — it is intentional and the fallback clamp behaviour is kept.
-  GLSL reversed-edge uses (sky mist, waterfall splash) are rewritten as `1 − smoothstep(lo, hi, x)`
-  with ascending edges per R12 — GLSL `smoothstep` is undefined when `edge0 > edge1`.
-- **Never `.clone()` a `ShaderMaterial`**, and never reassign a key on `G`/`NIGHT_UNIFORMS`/
-  `SHADER_NIGHT_UNIFORMS`/`LIGHTING_UNIFORMS` (all four containers are frozen — this throws by
-  design). Both would silently break the shared-uniform-by-reference contract.
-- **`npr()` option literals keep the original call site's keys, key order and values (R7)** —
-  the cache key is `JSON.stringify(options)`, so a reordered or normalised literal creates a
-  distinct, untracked material instance and shifts the merge-batch/draw-call counts.
-- **Scalar-helper substitutions** (`wrapAngle`, `positiveModulo`, `exponentialResponse`) may
-  replace an equivalent inline expression only when the substitution is exact:
-  - `wrapAngle(h − r)` may replace an inline `atan2(sin(h − r), cos(h − r))` call site (station
-    walker heading, bird heading, village-resident heading).
-  - `positiveModulo(x, L)` may replace an inline `((x % L) + L) % L`, including the wrapped
-    fraction form `(((s / L) % 1) + 1) % 1`, which becomes `positiveModulo(s / L, 1)`.
-  - `exponentialResponse(dt, r)` may replace an inline `1 − exp(−dt · r)` only when `r` is a
-    single operand or a fully parenthesised expression. Never collapse a three-factor exponent
-    `−dt · a · b` (it evaluates as `((−dt) · a) · b`, not `−dt · (a · b)`), and never replace the
-    cloud-return exponential `exp(−CLOUD_RETURN_RESPONSE · dt)` — its exponent is rate-first, a
-    different form from `exponentialResponse`'s dt-first signature.
-- **Parity tests restore any global `.value` they mutate**, in a `finally` block — the uniform
-  bag and the `npr()` cache are process-global and shared across the whole test file.
-- **No original file:line citations in code comments**, ever — phase files may cite them as a
-  behaviour reference; `src/`/`tests/`/`tools/` never do.
-
-## Rules learned in the sign-off triage
+## 7. Rules learned in the sign-off triage
 
 - **Fix at the lowest failing layer.** Node signature → node lockstep scalars and log lines →
   browser ordered lists and counts → browser pixels → perf. A pixel diff with equal signatures and
-  lists points at shader output, uniforms, renderer settings, material creation order (the
-  `material.id` tie-break in the renderer's stable sort) or DOM/CSS.
+  lists points at shader output, uniforms, renderer settings, material creation order or DOM/CSS.
 - **Never loosen a threshold or compensate in the harness.** A drift is fixed in its owning module
   (traceability table in `codebase-summary.md`) with a regression assertion in that module's test.
-- **Instance dispatch is a contract.** The frame loop reads `updateTimeOfDay`, `updateCamera`,
-  `world.updateCloudCamera` and `render` from the instance every frame; caching a reference would
-  silently disable the harness overrides on the clone only.
-- **Font readiness is judged in the build task.** The station sign is drawn during construction;
-  the hook's `fredokaReadyAtBuild` (same task) decides a reload, not the earlier loader label; a
-  sign-canvas hash that differs from the run's reference reloads too (same budget of 2).
+- **Font readiness is judged in the build task.** The station sign is drawn during construction; the
+  hook's `fredokaReadyAtBuild` decides a reload, and a sign-canvas hash that differs from the run's
+  reference reloads too (at most 2 reloads in sign-off).
 - **One browser context per sign-off shot**, and every wait is on state (loader hidden, toast
   settled, frames processed), never on wall-clock time: headless SwiftShader runs near 2 FPS.
-- **Lockstep stepping swaps `Math.random` and `console.log` per side** only for the duration of
-  that side's step, restoring both even on a throw.
+- **Lockstep stepping swaps `Math.random` and `console.log` per side** only for the duration of that
+  side's step, restoring both even on a throw.
+- **UI transitions leak into screenshots.** The capture CSS sets `transition: none !important` on UI
+  descendants: a running transition outranks `!important` and kept HUD buttons visible for several
+  frames.
 
-## Git and commits
+## 8. Tool-path hygiene
 
-- **Identity:** repo-local only — `git config user.name tranhuuhuy297` and
+Local shell hooks block any command text containing a `node_modules`/`dist`/`build`/`vendor`/
+`coverage`/`target`/`.git` path segment. Run entry points through npm scripts or files under
+`tools/`/`tests/`; Playwright is imported by file URL from inside the tools. This applies to command
+text only: `tools/static-dev-server.mjs` and `.gitignore` legitimately contain the literal
+`node_modules`. Shell loops run under `bash -c` or a heredoc, because zsh does not word-split `$var`.
+
+## 9. Git and commits
+
+- **Identity:** repo-local only: `git config user.name tranhuuhuy297` and
   `git config user.email tranhuuhuy297@gmail.com`. Never `--global`. Verify with
   `git config --get user.email` before the first commit.
 - **Ignore rules:** `.gitignore` (`node_modules/`, `.parity-cache/`, `.parity-output/`, `.vercel/`,
   `*.log`, `.DS_Store`, `.claude/agent-memory/`) is written before `npm install` and before any
-  `git add`. `.vercelignore` also drops `.claude/` so local agent notes never ship.
-- **Staging:** explicit paths only, never `git add -A`/`git add .`; check `git status --porcelain`
+  `git add`.
+- **Staging:** explicit paths only, never `git add -A` / `git add .`; check `git status --porcelain`
   before every commit.
 - **Gate:** `npm test && npm run check:lines` must both be green before every commit.
-- **Message type:** conventional commits — `feat:`/`fix:`/`test:`/`refactor:` for code changes;
-  `chore:`/`docs:` only for tooling-only or docs-only commits.
+- **Message type:** conventional commits: `feat:` / `fix:` / `test:` / `refactor:` for code;
+  `chore:` / `docs:` only for tooling- or docs-only commits (the repo has no CI).
 - **Message content:** an optional scope (`feat(ui):`), a subject describing the change, no AI
   references, no phase numbers or finding ids.
-- **Remote:** never pushed unless explicitly requested.
+- **Agents never commit.** Implementation subagents return their work; only the orchestrator (or the
+  owner) commits, after review. One agent once made six unreviewed commits because its definition
+  said "commit"; they had to be removed.
+- **Remote:** the repository is private on GitHub (`tranhuuhuy297/train-diorama`); push only when the
+  owner asks.

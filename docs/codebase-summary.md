@@ -1,22 +1,29 @@
 # Codebase summary
 
-Tree reflects the repository at release 1.0.0, the full-scene parity sign-off (scaffold/shell/HUD, core noise/materials/
-effects/geometry, the real engine: renderer, frame loop, palettes, sky, shadow/post, pixel
-art, overview camera; then the debug menu, the parity hook and the node + browser parity harness;
-then the world core: build-step registry, terrain, track and bridge; then the Mossbrook station,
-its wall clock and the world per-frame orchestrator; then the train; then the village cottages,
-chimney smoke, shrubs and the windmill; then the village residents, the forest with its canopy
-height grid and the riverside rocks; then the water, the cloud field and the hot-air balloon; then the
-station travelers, the bird perches and the bird flocks; then the full-scene sign-off tools, the performance
-budget probe, the research recapture, the deployment smoke check and the final docs). Below the tree: the
-module index with line counts, the files outside the unified tree, and the 147-row feature traceability table.
+The repository at release 1.0.0 (full-scene parity sign-off), refreshed for the 2026-10-04
+documentation pass. Sections: the annotated file tree, the module index with line counts, the
+support modules that exist to keep files small or to cover a behaviour with a test, and the feature
+traceability table (every scene feature → the files that implement it → the test or sign-off check
+that proves it).
+
+Quick facts:
+
+| Fact | Value |
+|---|---|
+| Code files | 245 (`index.html`, 5 CSS files, JS under `src/`, MJS under `tests/` and `tools/`), 21,395 lines |
+| Largest file | 199 lines (`tests/unit/keyboard-shortcut-resolution.test.mjs`); `npm run check:lines` fails at 200 |
+| Runtime modules | 126 JS files under `src/` (8,563 lines), loaded unbundled through the import map |
+| Tests | 296 unit tests in 37 test files (`npm test`), 79 node parity tests in 13 files (`npm run test:parity`) |
+| Repository contents | code, docs (incl. `docs/techniques/`, `docs/prompt-log/`), 7 screenshots, two SVG assets, config; `.parity-cache/`, `.parity-output/`, `node_modules/`, `.vercel/`, `.claude/agent-memory/` are gitignored |
+| Dependencies | none at runtime (three.js and Fredoka from CDNs); devDependencies `three@0.186.0`, `playwright@1.62.0` |
 
 ```
 train-diorama/
 ├── index.html                                   page shell: DOM, import map, fonts, analytics stub
 ├── package.json / package-lock.json             scripts (dev/test/test:parity/check:lines/parity:*), devDependencies
-├── vercel.json / .vercelignore / .gitignore      deploy + ignore config
-├── README.md                                     quick start, scripts, structure, credits
+├── vercel.json / .vercelignore / .gitignore      optional static-host config + ignore rules
+├── README.md                                     status, gallery, quick start, scripts, structure, docs index, controls, credits
+├── CLAUDE.md                                     operating manual for Claude Code: commands, folder map, hard rules, gotchas
 ├── assets/
 │   ├── train-diorama-logo.svg                   original Fredoka wordmark + locomotive motif
 │   └── clock-favicon.svg                        original clock glyph
@@ -96,7 +103,7 @@ train-diorama/
 │   │   ├── sheep/
 │   │   │   ├── sheep-geometry-and-instanced-meshes.js   SHEEP_CAPACITY 27, SHEEP_LEGS, SHEEP_EARS, createSheepInstancedMeshes (body/leg/ear layers)
 │   │   │   ├── sheep-pasture-ground-query.js            sheepGroundAt(world, x, z, normalOut): pasture mask + slope normal
-│   │   │   ├── pasture-sheep-spawner.js                 spawnPastureSheep: 24 sheep in ≤ 4000 attempts (W5b draws)
+│   │   │   ├── pasture-sheep-spawner.js                 spawnPastureSheep: 24 sheep in ≤ 4000 attempts (world.rand, after the rocks)
 │   │   │   ├── trackside-sheep-flock-site.js            findTracksideFlockSite (clearing score), createTrackSheep (3 routes + r1.2 clearings)
 │   │   │   ├── build-sheep-flock.js                     buildSheepFlock: meshes → pasture → clearing → rail sheep → counts → add → pose
 │   │   │   ├── track-sheep-escape-state-machine.js      TRACK_SHEEP_PRESETS, advanceTrackSheep, advanceTrackSheepFlock (slot 2, [SHEEP] logs)
@@ -152,7 +159,7 @@ train-diorama/
 │       │   ├── station-luggage-props.js                       traveler cases, grandmother's 3-case stack
 │       │   └── station-stairs-railings-footpath.js            pad #2, 5 steps, railings, footpath ribbon + 26 exclusions
 │       ├── village/
-│       │   ├── village-house-placement.js                     buildVillage: ring search (W1 draws), reject tests, pads, merge, r2.6 exclusions, villageHomes
+│       │   ├── village-house-placement.js                     buildVillage: ring search (first world.rand consumer), reject tests, pads, merge, r2.6 exclusions, villageHomes
 │       │   ├── village-house-palette-materials.js             ROOF_COLORS, createVillagePalette (14 items in creation order)
 │       │   ├── village-house-body-and-roof.js                 addHouseShell, addHouseDoorAndTrim, chimneyCentre
 │       │   ├── village-house-windows-and-shutters.js          SHUTTER_ANGLES, shutterAngleIndex, window glows, windows + shutters
@@ -160,17 +167,17 @@ train-diorama/
 │       │   └── village-shrubs-instanced.js                    SHRUB_COLORS, buildVillageShrubs (6 per house, no draws)
 │       ├── trees/
 │       │   ├── tree-species-geometries.js                     TREE_TRUNK_COLOR, createTreeSpeciesGeometries (conifer, round, cluster, bush)
-│       │   ├── tree-scatter-rules.js                          scatterTrees: 14000 attempts (W4 draws), tints, autumn/blossom accents
+│       │   ├── tree-scatter-rules.js                          scatterTrees: 14000 attempts on world.rand, tints, autumn/blossom accents
 │       │   ├── tree-instanced-layers.js                       buildTrees: canopy grid, sway/bush materials, 4 layers → treeLayers
 │       │   └── tree-canopy-height-grid.js                     70×70 Float32 grid: stampCanopyHeights, treeCanopyHeightAt
 │       ├── rocks/
-│       │   └── riverside-rock-scatter.js                      buildRiversideRocks: ≤ 80 instanced dodecahedra (W5a draws)
+│       │   └── riverside-rock-scatter.js                      buildRiversideRocks: ≤ 80 instanced dodecahedra (world.rand)
 │       ├── perches/
 │       │   └── bird-perch-builders.js                         buildBirdPerches (step 16): bridge-1..3, station-roof, trackside-2..4
 │       ├── water/
 │       │   └── river-water-and-waterfall-builder.js           findWaterfallMouth, createWaterfallGeometry (8×24), buildWater (step 13)
 │       ├── sky/
-│       │   ├── cloud-field-spawner.js                         createCloudSpawners (A 8 / B 7 / C 18), buildClouds (step 14, W7 draws, last W consumer)
+│       │   ├── cloud-field-spawner.js                         createCloudSpawners (A 8 / B 7 / C 18), buildClouds (step 14, last world.rand consumer)
 │       │   └── cloud-drift-fade-and-camera-avoidance.js       CLOUD_CAMERA_BUFFER, CLOUD_RETURN_RESPONSE, updateCloudDrift (slot 10), updateCloudCamera
 │       ├── balloon/
 │       │   ├── hot-air-balloon-envelope-and-basket.js         BALLOON_LOCAL_GLOW, BALLOON_ENVELOPE_PROFILE, envelope geometry/mesh, basket (185 boxes), ropes, sandbags
@@ -274,7 +281,7 @@ train-diorama/
 │   │   ├── parity-capture-css-hides-ui-without-transitions.test.mjs captureCssText: UI roots + descendants, transitions off
 │   │   ├── village-and-windmill-build-logic.test.mjs     shutter cycle, smoke formula, rotor, shrubs, village guard, site search, windmill structure
 │   │   ├── parity-village-windmill-shots-regions-and-probe.test.mjs village shots, unbuiltAfterWindmill, regions + crops, probe section
-│   │   ├── village-walk-cycle-and-tree-rock-scatter.test.mjs walk-cycle table, canopy grid edges, W4/W5a draw accounting (stub worlds)
+│   │   ├── village-walk-cycle-and-tree-rock-scatter.test.mjs walk-cycle table, canopy grid edges, tree/rock world.rand draw accounting (stub worlds)
 │   │   ├── parity-forest-residents-shots-actions-and-probe.test.mjs forest shots, water/figure hide sets, page actions, forest probe, relations
 │   │   ├── track-sheep-escape-state-machine.test.mjs   FSM windows, reaction delay, same-step jump, escape/return, flock loop, fuzz vs original
 │   │   ├── parity-sheep-shots-and-probe.test.mjs        sheep shots, close-up pose, probe section and comparison rules
@@ -298,36 +305,31 @@ train-diorama/
 │       ├── sheep-flock-oracle-train-parity.test.mjs     oracle train lockstep: 260 s day/night/wake, 90 s at speedMul 2.5, 60 s of 0.1 s steps
 │       ├── water-clouds-balloon-parity.test.mjs         cold-cache full builds: UUID draws per step, fingerprint, 33 clouds, signatures, materials, 300 s lockstep
 │       ├── station-travelers-and-birds-parity.test.mjs  first-build draws, perches, flock init, lane floats, walker events, oracle lockstep (180 s + 60 s at dt 0.1)
-│       ├── full-scene-signature-parity.test.mjs         whole scene vs the oracle: signature, R9 lists, world summary, 6 × 1800 lockstep frames + logs
+│       ├── full-scene-signature-parity.test.mjs         whole scene vs the oracle: signature, ordered lists (scene children, glows, shadow-hidden), world summary, 6 × 1800 lockstep frames + logs
 │       └── fixtures/station-travelers-and-birds-expected.json perch, flock, walker and [BIRDS] timeline fixtures
-└── docs/                                        overview/PDR, architecture, this file, standards, design, roadmap, changelog, parity guide, deployment guide
+└── docs/
+    ├── project-overview-pdr.md                  goal, decisions, scope, acceptance status
+    ├── system-architecture.md                   runtime, engine, build steps, per-frame order, every subsystem
+    ├── codebase-summary.md                      this file
+    ├── code-standards.md                        code rules, parity-critical rules, tests, git
+    ├── design-guidelines.md                     style bible, HUD/loader tokens, logo and favicon spec
+    ├── parity-testing-guide.md                  node oracle, browser capture/compare/probe, sign-off results
+    ├── development-roadmap.md                   14 milestones, post-parity backlog (28 kept quirks)
+    ├── project-changelog.md                     version history
+    ├── deployment-guide.md                      local use; optional static-host deploy
+    ├── diorama-techniques.md                    index of the technique catalogue in techniques/
+    ├── how-it-was-built.md                      research → plan → multi-agent implementation story
+    ├── techniques/                              14 technique chapters (01-scene-composition-and-scale.md … 14-performance-budget-and-scaling-up.md)
+    ├── prompt-log/                              owner prompts and the original Workflow scripts as they ran
+    └── images/                                  7 screenshots (overview day/evening/night/pixel art, train, bridge, bridge at night)
 ```
-
-## Phase status
-
-| Phase | Scope | Status |
-|---|---|---|
-| P01 | Scaffold, shell, HUD, settings, loading screen | Complete |
-| P02 | Core math/noise, shared materials, geometry helpers, parity oracle | Complete |
-| P03 | Engine: renderer, frame loop, palettes, sky, shadow/post, pixel art, overview camera | Complete |
-| P04 | Debug menu, parity hook, node + browser parity harness | Complete |
-| P05 | World core: build-step registry, terrain, track, bridge | Complete |
-| P06 | Mossbrook station, wall clock, world per-frame orchestrator | Complete |
-| P07 | Train model, station-stop motion, smoke puffs, brake sparks, headlight | Complete |
-| P08 | Village cottages, chimney smoke, shrubs, windmill (build steps 7–8, update slots 8–9) | Complete |
-| P09 | Village residents, forest + canopy grid, riverside rocks (build steps 10–12, update slots 5–6) | Complete |
-| P10 | Camera modes: free fly (pointer lock), train fly-along rig, bridge tripod | Complete (headed pointer-lock check pending) |
-| P11 | Sheep flock: pasture sheep, trackside clearing, rail-sheep escape state machine (build step 12, update slots 2–3) | Complete |
-| P12 | Water + waterfall shaders, 33-cloud field with camera avoidance, hot-air balloon (build steps 13–15, update slots 10–11, frame step 7) | Complete |
-| P13 | Station travellers (walker IK, grandmother, head-look), bird perches (build step 16), bird flocks (update slots 4, 6, 7; birds after the world) | Complete |
-| P14 | Full-scene parity sign-off, performance budget, docs, deployment prep | Complete (deploy itself awaits approval) |
 
 ## Module index (line counts)
 
-245 code files, every one under 200 lines (`npm run check:lines`). Counts are `wc -l` at release 1.0.0.
+`wc -l` per directory on 2026-10-04 (245 code files, every one under 200 lines).
 
-- `./` (1 files, 100 lines): index.html 100
-- `src/` (1 files, 72 lines): main-entry.js 72
+- `./` (1 file, 100 lines): index.html 100
+- `src/` (1 file, 72 lines): main-entry.js 72
 - `src/core/` (3 files, 106 lines): disable-three-color-management.js 5, scalar-math-helpers.js 15, seeded-prng-and-gradient-noise.js 86
 - `src/effects/` (2 files, 140 lines): night-headlight-light-cone.js 56, night-light-glow-sprites.js 84
 - `src/engine/` (11 files, 622 lines): custom-shadow-depth-pass.js 48, diorama-scene-composition.js 54, diorama.js 186, frame-loop-scheduler.js 39, night-light-glow-registry.js 17, parity-test-hook.js 21, post-ink-outline-dither-pass.js 105, render-pipeline.js 22, render-resolution-resizer.js 39, simulation-step.js 11, time-of-day-palettes-and-transition.js 80
@@ -344,260 +346,286 @@ train-diorama/
 - `src/world/` (4 files, 246 lines): world-build-steps.js 77, world-constants.js 37, world-per-frame-update.js 30, world.js 102
 - `src/world/balloon/` (3 files, 254 lines): hot-air-balloon-burner-flame-and-flight.js 83, hot-air-balloon-envelope-and-basket.js 106, hot-air-balloon-pilot-figure.js 65
 - `src/world/bridge/` (2 files, 162 lines): bridge-arch-columns-piers-abutments.js 113, bridge-deck-girders-and-railings.js 49
-- `src/world/perches/` (1 files, 111 lines): bird-perch-builders.js 111
-- `src/world/rocks/` (1 files, 37 lines): riverside-rock-scatter.js 37
+- `src/world/perches/` (1 file, 111 lines): bird-perch-builders.js 111
+- `src/world/rocks/` (1 file, 37 lines): riverside-rock-scatter.js 37
 - `src/world/sky/` (2 files, 200 lines): cloud-drift-fade-and-camera-avoidance.js 91, cloud-field-spawner.js 109
 - `src/world/station/` (11 files, 646 lines): build-station.js 48, station-building-shell-and-roof.js 65, station-building-windows-and-shutters.js 47, station-lamps-with-night-glow.js 37, station-luggage-props.js 44, station-name-board-sign.js 79, station-palette-materials.js 42, station-platform-shelter-bench.js 49, station-site-placement.js 88, station-stairs-railings-footpath.js 98, station-wall-clock.js 49
 - `src/world/terrain/` (5 files, 348 lines): building-ground-flattening.js 58, river-distance-and-natural-height.js 38, terrain-heightmap-grading.js 74, terrain-skirt-plinth-and-water-height-texture.js 72, terrain-surface-mesh-and-vertex-colors.js 106
 - `src/world/track/` (3 files, 157 lines): bridge-span-detection.js 36, track-ballast-rails-sleepers.js 57, track-spline-frames-and-queries.js 64
 - `src/world/trees/` (4 files, 211 lines): tree-canopy-height-grid.js 55, tree-instanced-layers.js 33, tree-scatter-rules.js 71, tree-species-geometries.js 52
 - `src/world/village/` (6 files, 353 lines): village-chimney-smoke.js 56, village-house-body-and-roof.js 64, village-house-palette-materials.js 40, village-house-placement.js 73, village-house-windows-and-shutters.js 71, village-shrubs-instanced.js 49
-- `src/world/water/` (1 files, 86 lines): river-water-and-waterfall-builder.js 86
+- `src/world/water/` (1 file, 86 lines): river-water-and-waterfall-builder.js 86
 - `src/world/windmill/` (3 files, 152 lines): windmill-hay-bales.js 41, windmill-rotor.js 27, windmill-site-and-body.js 84
 - `styles/` (5 files, 447 lines): base-reset-and-utilities.css 145, hud-panel-and-controls.css 85, loading-overlay.css 97, night-theme-overrides.css 45, toast-and-debug-menu.css 75
 - `tests/helpers/` (18 files, 1424 lines): clone-simulation-driver.mjs 157, clone-world-factory.mjs 21, counted-full-world-builds.mjs 55, fresh-process-train-material-ids.mjs 29, minimal-dom-shim.mjs 67, oracle-camera-controls-stub.mjs 29, original-module-loader.mjs 98, original-simulation-oracle.mjs 175, original-world-stepper.mjs 71, quantised-number-hashing.mjs 48, scene-graph-signature.mjs 119, scene-signature-key-builders.mjs 97, sheep-flock-parity-lockstep.mjs 89, smoke-puff-behaviour-checks.mjs 69, station-travelers-and-birds-first-build.mjs 103, synthetic-merge-rig.mjs 106, typed-array-fnv1a-hash.mjs 8, world-summary-digest.mjs 83
 - `tests/parity/` (13 files, 2023 lines): camera-modes-parity.test.mjs 188, full-scene-signature-parity.test.mjs 180, harness-self-check.test.mjs 153, residents-trees-rocks-parity.test.mjs 176, sheep-flock-oracle-train-parity.test.mjs 84, sheep-flock-parity.test.mjs 137, station-parity.test.mjs 110, station-travelers-and-birds-parity.test.mjs 184, terrain-track-bridge-parity.test.mjs 182, train-model-and-motion-parity.test.mjs 174, train-simulation-oracle-and-composition-parity.test.mjs 154, village-windmill-parity.test.mjs 146, water-clouds-balloon-parity.test.mjs 155
-- `tests/unit/` (38 files, 4910 lines): bird-flock-state-machine.test.mjs 102, camera-mode-director-switching.test.mjs 90, diorama-scene-composition-order.test.mjs 46, frame-cadence-and-render-resolution.test.mjs 188, free-fly-fly-along-and-bridge-camera-rigs.test.mjs 179, hud-right-click-reset-to-defaults.test.mjs 72, keyboard-shortcut-resolution.test.mjs 199, loading-screen-hint-rotation.test.mjs 43, loading-screen-step-runner.test.mjs 104, loading-screen-test-fixtures.mjs 99, merge-static-geometry-and-glows.test.mjs 198, npr-material-cache-and-glsl-parity.test.mjs 199, original-route-hook-error-surfacing.test.mjs 74, overview-intro-and-camera-modes.test.mjs 178, parity-capture-css-hides-ui-without-transitions.test.mjs 22, parity-compare-meta-warnings.test.mjs 51, parity-forest-residents-shots-actions-and-probe.test.mjs 141, parity-harness-pure-logic.test.mjs 166, parity-metrics-math.test.mjs 87, parity-sheep-shots-and-probe.test.mjs 70, parity-shot-list-selection-and-stages.test.mjs 65, parity-signoff-shots-and-verdicts.test.mjs 164, parity-station-shots-hide-families-and-parking.test.mjs 99, parity-station-travelers-and-birds-shots-and-probe.test.mjs 82, parity-village-windmill-shots-regions-and-probe.test.mjs 119, parity-water-clouds-balloon-shots-and-probe.test.mjs 96, parity-world-core-hide-set-and-strict-shots.test.mjs 80, seeded-prng-and-gradient-noise.test.mjs 184, settings-validation-and-persistence.test.mjs 147, shadow-post-and-render-pipeline-passes.test.mjs 182, station-sign-clock-and-build-counts.test.mjs 165, time-of-day-transition.test.mjs 198, track-sheep-escape-state-machine.test.mjs 181, train-station-motion-controller.test.mjs 169, village-and-windmill-build-logic.test.mjs 151, village-walk-cycle-and-tree-rock-scatter.test.mjs 142, waterfall-cloud-avoidance-and-balloon-flight.test.mjs 193, world-core-helpers-registry-and-golden-values.test.mjs 185
+- `tests/unit/` (38 files, 4923 lines): bird-flock-state-machine.test.mjs 102, camera-mode-director-switching.test.mjs 90, diorama-scene-composition-order.test.mjs 46, frame-cadence-and-render-resolution.test.mjs 188, free-fly-fly-along-and-bridge-camera-rigs.test.mjs 179, hud-right-click-reset-to-defaults.test.mjs 77, keyboard-shortcut-resolution.test.mjs 199, loading-screen-hint-rotation.test.mjs 43, loading-screen-step-runner.test.mjs 104, loading-screen-test-fixtures.mjs 99, merge-static-geometry-and-glows.test.mjs 198, npr-material-cache-and-glsl-parity.test.mjs 199, original-route-hook-error-surfacing.test.mjs 74, overview-intro-and-camera-modes.test.mjs 178, parity-capture-css-hides-ui-without-transitions.test.mjs 22, parity-compare-meta-warnings.test.mjs 51, parity-forest-residents-shots-actions-and-probe.test.mjs 141, parity-harness-pure-logic.test.mjs 166, parity-metrics-math.test.mjs 95, parity-sheep-shots-and-probe.test.mjs 70, parity-shot-list-selection-and-stages.test.mjs 65, parity-signoff-shots-and-verdicts.test.mjs 164, parity-station-shots-hide-families-and-parking.test.mjs 99, parity-station-travelers-and-birds-shots-and-probe.test.mjs 82, parity-village-windmill-shots-regions-and-probe.test.mjs 119, parity-water-clouds-balloon-shots-and-probe.test.mjs 96, parity-world-core-hide-set-and-strict-shots.test.mjs 80, seeded-prng-and-gradient-noise.test.mjs 184, settings-validation-and-persistence.test.mjs 147, shadow-post-and-render-pipeline-passes.test.mjs 182, station-sign-clock-and-build-counts.test.mjs 165, time-of-day-transition.test.mjs 198, track-sheep-escape-state-machine.test.mjs 181, train-station-motion-controller.test.mjs 169, village-and-windmill-build-logic.test.mjs 151, village-walk-cycle-and-tree-rock-scatter.test.mjs 142, waterfall-cloud-avoidance-and-balloon-flight.test.mjs 193, world-core-helpers-registry-and-golden-values.test.mjs 185
 - `tools/` (2 files, 166 lines): check-file-line-limits.mjs 54, static-dev-server.mjs 112
-- `tools/parity/` (42 files, 3747 lines): camera-mode-parity-shots.mjs 26, camera-ui-runtime-probe.mjs 194, capture-parity-shots.mjs 156, compare-parity-shots.mjs 163, deployment-smoke-check.mjs 137, dom-shot-page-helpers.mjs 87, fetch-original-source.mjs 167, forest-residents-runtime-probe.mjs 34, hook-and-debug-menu-browser-checks.mjs 136, intra-site-shot-checks.mjs 53, original-site-route-hooks.mjs 75, page-hide-set-application.mjs 75, page-parity-helpers.mjs 178, page-shot-actions.mjs 75, parity-metrics-math.mjs 79, parity-shot-factory-and-camera-poses.mjs 32, parity-shot-list.mjs 141, parity-shot-stages-and-hide-sets.mjs 27, parity-shot-validation.mjs 55, performance-budget-probe.mjs 153, playwright-browser-launcher.mjs 106, png-diff-in-page.mjs 75, post-pass-synthetic-input-probe.mjs 96, probe-result-diffing.mjs 27, research-capture-paths.mjs 21, research-recapture-and-contact-sheet.mjs 141, runtime-counts-probe.mjs 192, scenario-probe-sections.mjs 27, sheep-flock-parity-shots.mjs 24, sheep-flock-runtime-probe.mjs 92, shot-region-projection.mjs 77, signoff-page-helpers.mjs 101, signoff-parity-shots.mjs 113, signoff-shot-capture.mjs 181, signoff-shot-verdicts.mjs 59, signoff-state-probe.mjs 88, station-runtime-probe.mjs 96, station-travelers-and-birds-parity-shots.mjs 20, station-travelers-and-birds-runtime-probe.mjs 37, village-windmill-runtime-probe.mjs 24, water-clouds-balloon-parity-shots.mjs 36, water-clouds-balloon-runtime-probe.mjs 71
+- `tools/parity/` (42 files, 3749 lines): camera-mode-parity-shots.mjs 26, camera-ui-runtime-probe.mjs 194, capture-parity-shots.mjs 156, compare-parity-shots.mjs 163, deployment-smoke-check.mjs 137, dom-shot-page-helpers.mjs 87, fetch-original-source.mjs 167, forest-residents-runtime-probe.mjs 34, hook-and-debug-menu-browser-checks.mjs 136, intra-site-shot-checks.mjs 53, original-site-route-hooks.mjs 75, page-hide-set-application.mjs 75, page-parity-helpers.mjs 178, page-shot-actions.mjs 75, parity-metrics-math.mjs 79, parity-shot-factory-and-camera-poses.mjs 32, parity-shot-list.mjs 141, parity-shot-stages-and-hide-sets.mjs 27, parity-shot-validation.mjs 55, performance-budget-probe.mjs 155, playwright-browser-launcher.mjs 106, png-diff-in-page.mjs 75, post-pass-synthetic-input-probe.mjs 96, probe-result-diffing.mjs 27, research-capture-paths.mjs 21, research-recapture-and-contact-sheet.mjs 141, runtime-counts-probe.mjs 192, scenario-probe-sections.mjs 27, sheep-flock-parity-shots.mjs 24, sheep-flock-runtime-probe.mjs 92, shot-region-projection.mjs 77, signoff-page-helpers.mjs 101, signoff-parity-shots.mjs 113, signoff-shot-capture.mjs 181, signoff-shot-verdicts.mjs 59, signoff-state-probe.mjs 88, station-runtime-probe.mjs 96, station-travelers-and-birds-parity-shots.mjs 20, station-travelers-and-birds-runtime-probe.mjs 37, village-windmill-runtime-probe.mjs 24, water-clouds-balloon-parity-shots.mjs 36, water-clouds-balloon-runtime-probe.mjs 71
 
-## Files outside the unified tree
+## Support modules and split files
 
-Files that exist in the repository but not in the planned folder tree, with the phase that created them.
-They keep the planned tools and tests under 200 lines or add a covering test; their roles in the test and
-parity graph are described in `system-architecture.md` ("Files outside the unified tree").
+Files that keep a module under the 200-line budget (a split), share plumbing between suites,
+or add a covering test for one behaviour. Their roles in the parity graph are described in
+`system-architecture.md` ("Parity harness overview").
 
-| creating phase | file | purpose |
+| Group | File | Purpose |
 |---|---|---|
-| P01 | `package-lock.json` | pinned dev dependency tree (playwright 1.62.0, three 0.186.0) |
-| P01 | `tests/unit/loading-screen-hint-rotation.test.mjs` | loader hint rotation cases split from the step-runner test |
-| P01 | `tests/unit/loading-screen-test-fixtures.mjs` | shared fake loader DOM, manual rAF and microtask helpers |
-| P02 | `tests/helpers/synthetic-merge-rig.mjs` | synthetic merge rig + describeTree for the static-merge tests |
-| P03 | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs` | post uniforms, shadow pass and render order |
-| P04 | `tests/helpers/quantised-number-hashing.mjs` | quantise / hashNumbers / hashString for signatures |
-| P04 | `tests/helpers/scene-signature-key-builders.mjs` | material, geometry, instance and texture keys of the signature |
-| P04 | `tests/unit/parity-harness-pure-logic.test.mjs` | hook, route patch, perf text, metrics, shim, signatures |
-| P04 | `tests/unit/parity-compare-meta-warnings.test.mjs` | capture-meta warnings of the compare tool |
-| P04 | `tests/unit/original-route-hook-error-surfacing.test.mjs` | route-hook errors beat the readiness timeout |
-| P04 | `tools/parity/dom-shot-page-helpers.mjs` | capture CSS, DOM actions, settle, clip rectangles |
-| P04 | `tools/parity/hook-and-debug-menu-browser-checks.mjs` | debug-menu and hook exposure browser checks |
-| P04 | `tools/parity/post-pass-synthetic-input-probe.mjs` | post-pass outputs on synthetic inputs, both sites |
-| P04 | `tools/parity/probe-result-diffing.mjs` | probe JSON diffing |
-| P04 | `tools/parity/research-capture-paths.mjs` | research capture folder resolution |
-| P05 | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` | world helpers, build-step registry, golden values |
-| P05 | `tests/unit/diorama-scene-composition-order.test.mjs` | composition order, shadow list, glow registry |
-| P05 | `tests/unit/parity-world-core-hide-set-and-strict-shots.test.mjs` | allButWorldCore hide set and strict world-core shots |
-| P05 | `tools/parity/page-hide-set-application.mjs` | in-page hide sets and families |
-| P06 | `tests/helpers/typed-array-fnv1a-hash.mjs` | FNV-1a-32 golden hashes of typed arrays |
-| P06 | `tests/unit/station-sign-clock-and-build-counts.test.mjs` | sign canvas writes, clock angles, station goldens |
-| P06 | `tests/unit/parity-station-shots-hide-families-and-parking.test.mjs` | station shots, hide families, train parking |
-| P06 | `tests/unit/parity-shot-list-selection-and-stages.test.mjs` | shot validation, stage gating and selection |
-| P06 | `tools/parity/station-runtime-probe.mjs` | station probe section, sign hash, live clock |
-| P07 | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | 18 000-frame train oracle lockstep, composition layout |
-| P07 | `tests/helpers/oracle-camera-controls-stub.mjs` | camera + control stubs shared by oracle and driver |
-| P07 | `tests/helpers/smoke-puff-behaviour-checks.mjs` | smoke emission/lifetime behaviour checks |
-| P07 | `tests/helpers/fresh-process-train-material-ids.mjs` | cold-cache train material id rows (child process) |
-| P07 | `tests/unit/parity-capture-css-hides-ui-without-transitions.test.mjs` | capture CSS hides UI roots without transitions |
-| P08 | `tests/unit/village-and-windmill-build-logic.test.mjs` | village and windmill build logic |
-| P08 | `tests/unit/parity-village-windmill-shots-regions-and-probe.test.mjs` | village shots, regions, probe section |
-| P08 | `tools/parity/shot-region-projection.mjs` | named screen regions and device crops |
-| P08 | `tools/parity/parity-shot-factory-and-camera-poses.mjs` | shot() factory and shared camera poses |
-| P08 | `tools/parity/village-windmill-runtime-probe.mjs` | village/windmill probe section |
-| P09 | `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` | walk-cycle table, canopy grid, scatter draw accounting |
-| P09 | `tests/unit/parity-forest-residents-shots-actions-and-probe.test.mjs` | forest shots, page actions, forest probe |
-| P09 | `tools/parity/intra-site-shot-checks.mjs` | same-site shot relations and action results |
-| P09 | `tools/parity/page-shot-actions.mjs` | uniform offset, layer switch, in-page poses, paused hold |
-| P09 | `tools/parity/forest-residents-runtime-probe.mjs` | tree/rock/resident probe section |
-| P10 | `tests/unit/camera-mode-director-switching.test.mjs` | setCameraMode switching rules |
-| P10 | `tests/unit/free-fly-fly-along-and-bridge-camera-rigs.test.mjs` | free-fly, fly-along and bridge rigs |
-| P10 | `tools/parity/camera-mode-parity-shots.mjs` | camera-mode shots |
-| P10 | `tools/parity/camera-ui-runtime-probe.mjs` | live camera UI / pointer-lock probe |
-| P11 | `tests/helpers/sheep-flock-parity-lockstep.mjs` | sheep lockstep helpers |
-| P11 | `tests/parity/sheep-flock-oracle-train-parity.test.mjs` | sheep against the oracle train |
-| P11 | `tests/unit/parity-sheep-shots-and-probe.test.mjs` | sheep shots and probe section |
-| P11 | `tools/parity/sheep-flock-parity-shots.mjs` | sheep close-ups and hop shots |
-| P11 | `tools/parity/sheep-flock-runtime-probe.mjs` | sheep probe section |
-| P12 | `tests/helpers/counted-full-world-builds.mjs` | full builds with Math.random draws counted per step |
-| P12 | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` | waterfall, cloud drift/avoidance, balloon flight |
-| P12 | `tests/unit/parity-water-clouds-balloon-shots-and-probe.test.mjs` | water/cloud/balloon shots and probe section |
-| P12 | `tools/parity/water-clouds-balloon-parity-shots.mjs` | water, waterfall, balloon and cloud shots |
-| P12 | `tools/parity/water-clouds-balloon-runtime-probe.mjs` | water/cloud/balloon probe section |
-| P13 | `tests/parity/fixtures/station-travelers-and-birds-expected.json` | perch, flock, walker and [BIRDS] fixtures |
-| P13 | `src/life/station/station-figure-parts.js` | attachMesh helper shared by the traveler figures |
-| P13 | `tests/helpers/station-travelers-and-birds-first-build.mjs` | first builds with draws counted, rig/flock readers |
-| P13 | `tests/unit/parity-station-travelers-and-birds-shots-and-probe.test.mjs` | travelers/birds shots and probe section |
-| P13 | `tools/parity/station-travelers-and-birds-parity-shots.mjs` | traveler and bird shots |
-| P13 | `tools/parity/station-travelers-and-birds-runtime-probe.mjs` | travelers/birds probe section |
-| P13 | `tools/parity/scenario-probe-sections.mjs` | per-scenario probe sections and verdicts |
-| P13 | `tools/parity/parity-shot-stages-and-hide-sets.mjs` | stages, thresholds, hide sets |
-| P13 | `tools/parity/parity-shot-validation.mjs` | shot list validation |
-| P14 | `tests/helpers/world-summary-digest.mjs` | self-contained world summary, ordered lists, instanced counts, sign hash |
-| P14 | `tools/parity/parity-metrics-math.mjs` | pure verdict math (EMA inversion, palette overlap, heap attribution) |
-| P14 | `tests/unit/parity-metrics-math.test.mjs` | unit tests of the verdict math |
-| P14 | `tools/parity/performance-budget-probe.mjs` | parity:perf CLI |
-| P14 | `tools/parity/research-recapture-and-contact-sheet.mjs` | parity:research CLI |
-| P14 | `tools/parity/deployment-smoke-check.mjs` | parity:smoke CLI |
-| P14 | `tools/parity/signoff-parity-shots.mjs` | sign-off shot set, probe states, research equivalents |
-| P14 | `tools/parity/signoff-page-helpers.mjs` | sign-off in-page helpers (moved out of page-parity-helpers to stay < 200 lines) |
-| P14 | `tools/parity/signoff-shot-capture.mjs` | sign-off capture (one context per shot) |
-| P14 | `tools/parity/signoff-shot-verdicts.mjs` | log-sequence, box, noise-floor and summary verdicts |
-| P14 | `tools/parity/signoff-state-probe.mjs` | parity:probe --states signoff |
-| P14 | `tools/parity/png-diff-in-page.mjs` | PNG diff code split out of the compare CLI |
-| P14 | `tests/unit/parity-signoff-shots-and-verdicts.test.mjs` | sign-off list, verdicts, probe and smoke judges |
-| P14 | `tests/unit/hud-right-click-reset-to-defaults.test.mjs` | covering test for the right-click resets |
+| Build and runtime | `package-lock.json` | pinned dev dependency tree (playwright 1.62.0, three 0.186.0) |
+| Build and runtime | `src/life/station/station-figure-parts.js` | `attachMesh` helper shared by the two traveler figures |
+| Loader tests | `tests/unit/loading-screen-hint-rotation.test.mjs` | hint rotation every 2600 ms, wrap-around, stop on completion |
+| Loader tests | `tests/unit/loading-screen-test-fixtures.mjs` | shared fake loader DOM, manual rAF and microtask helpers |
+| HUD tests | `tests/unit/hud-right-click-reset-to-defaults.test.mjs` | right-click resets each control to its default with its toast; pills flip only when away from default; outside a control the browser menu stays |
+| Engine tests | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs` | post uniforms, shadow pass and render order |
+| Engine tests | `tests/unit/diorama-scene-composition-order.test.mjs` | composition order, shadow-hidden list, glow registry |
+| Engine tests | `tests/unit/camera-mode-director-switching.test.mjs` | `setCameraMode` switching rules |
+| Engine tests | `tests/unit/free-fly-fly-along-and-bridge-camera-rigs.test.mjs` | free-fly, fly-along and bridge rigs |
+| World tests | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` | world helpers, build-step registry, golden values |
+| World tests | `tests/unit/station-sign-clock-and-build-counts.test.mjs` | sign canvas writes, clock angles, station goldens |
+| World tests | `tests/unit/village-and-windmill-build-logic.test.mjs` | village and windmill build logic |
+| World tests | `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` | walk-cycle table, canopy grid, scatter draw accounting |
+| World tests | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` | waterfall, cloud drift/avoidance, balloon flight |
+| Node oracle plumbing | `tests/helpers/synthetic-merge-rig.mjs` | synthetic merge rig + `describeTree` for the static-merge tests |
+| Node oracle plumbing | `tests/helpers/quantised-number-hashing.mjs` | `quantise` / `hashNumbers` / `hashString` for signatures |
+| Node oracle plumbing | `tests/helpers/scene-signature-key-builders.mjs` | material, geometry, instance and texture keys of the signature |
+| Node oracle plumbing | `tests/helpers/typed-array-fnv1a-hash.mjs` | FNV-1a-32 golden hashes of typed arrays |
+| Node oracle plumbing | `tests/helpers/oracle-camera-controls-stub.mjs` | camera + control stubs shared by the oracle and the clone driver |
+| Node oracle plumbing | `tests/helpers/counted-full-world-builds.mjs` | full builds with `Math.random` draws counted per build step |
+| Node oracle plumbing | `tests/helpers/world-summary-digest.mjs` | self-contained world summary, ordered lists, instanced counts, sign hash (also injected into pages) |
+| Node lockstep and fixtures | `tests/helpers/smoke-puff-behaviour-checks.mjs` | smoke emission and lifetime checks from the spec formulas |
+| Node lockstep and fixtures | `tests/helpers/fresh-process-train-material-ids.mjs` | cold-cache train material id rows from a child process |
+| Node lockstep and fixtures | `tests/helpers/sheep-flock-parity-lockstep.mjs` | sheep lockstep helpers |
+| Node lockstep and fixtures | `tests/helpers/station-travelers-and-birds-first-build.mjs` | first builds with draws counted, rig and flock readers |
+| Node lockstep and fixtures | `tests/parity/fixtures/station-travelers-and-birds-expected.json` | perch, flock, walker and `[BIRDS]` fixtures |
+| Node parity suites | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | 18 000-frame train oracle lockstep, composition layout |
+| Node parity suites | `tests/parity/sheep-flock-oracle-train-parity.test.mjs` | sheep against the oracle train |
+| Harness unit tests | `tests/unit/parity-harness-pure-logic.test.mjs` | hook, route patch, perf text, metrics, shim, signatures |
+| Harness unit tests | `tests/unit/parity-compare-meta-warnings.test.mjs` | capture-meta warnings of the compare tool |
+| Harness unit tests | `tests/unit/original-route-hook-error-surfacing.test.mjs` | route-hook errors beat the readiness timeout |
+| Harness unit tests | `tests/unit/parity-world-core-hide-set-and-strict-shots.test.mjs` | `allButWorldCore` hide set and strict world-core shots |
+| Harness unit tests | `tests/unit/parity-station-shots-hide-families-and-parking.test.mjs` | station shots, hide families, train parking |
+| Harness unit tests | `tests/unit/parity-shot-list-selection-and-stages.test.mjs` | shot validation, stage gating and selection |
+| Harness unit tests | `tests/unit/parity-capture-css-hides-ui-without-transitions.test.mjs` | capture CSS hides UI roots without transitions |
+| Harness unit tests | `tests/unit/parity-village-windmill-shots-regions-and-probe.test.mjs` | village shots, regions, probe section |
+| Harness unit tests | `tests/unit/parity-forest-residents-shots-actions-and-probe.test.mjs` | forest shots, page actions, forest probe |
+| Harness unit tests | `tests/unit/parity-sheep-shots-and-probe.test.mjs` | sheep shots and probe section |
+| Harness unit tests | `tests/unit/parity-water-clouds-balloon-shots-and-probe.test.mjs` | water/cloud/balloon shots and probe section |
+| Harness unit tests | `tests/unit/parity-station-travelers-and-birds-shots-and-probe.test.mjs` | travelers/birds shots and probe section |
+| Harness unit tests | `tests/unit/parity-metrics-math.test.mjs` | verdict maths: EMA inversion, median/CV, palette keys and overlap, loader marks, heap attribution, a gate that fails on zero samples |
+| Harness unit tests | `tests/unit/parity-signoff-shots-and-verdicts.test.mjs` | sign-off set (21 3D + 7 DOM), probe states and research equivalents, `--shots` selection, tagged console sequences, loader boxes, noise floor and summary, probe and smoke judges, mask exclusion, bounded steps, research exceptions |
+| Browser tooling splits | `tools/parity/dom-shot-page-helpers.mjs` | capture CSS, DOM actions, settle, clip rectangles |
+| Browser tooling splits | `tools/parity/page-hide-set-application.mjs` | in-page hide sets and families |
+| Browser tooling splits | `tools/parity/page-shot-actions.mjs` | uniform offset, layer switch, in-page poses, paused hold |
+| Browser tooling splits | `tools/parity/shot-region-projection.mjs` | named screen regions and device crops |
+| Browser tooling splits | `tools/parity/intra-site-shot-checks.mjs` | same-site shot relations and action results |
+| Browser tooling splits | `tools/parity/parity-shot-factory-and-camera-poses.mjs` | `shot()` factory and shared camera poses |
+| Browser tooling splits | `tools/parity/parity-shot-stages-and-hide-sets.mjs` | stages, thresholds, hide sets |
+| Browser tooling splits | `tools/parity/parity-shot-validation.mjs` | shot list validation |
+| Browser tooling splits | `tools/parity/research-capture-paths.mjs` | research capture folder resolution |
+| Browser tooling splits | `tools/parity/probe-result-diffing.mjs` | probe JSON diffing |
+| Browser tooling splits | `tools/parity/png-diff-in-page.mjs` | PNG diff code split out of the compare CLI |
+| Browser tooling splits | `tools/parity/signoff-page-helpers.mjs` | sign-off in-page helpers |
+| Browser tooling splits | `tools/parity/signoff-shot-capture.mjs` | sign-off capture (one browser context per shot) |
+| Browser tooling splits | `tools/parity/signoff-shot-verdicts.mjs` | log-sequence, box, noise-floor and summary verdicts |
+| Per-subsystem shots | `camera-mode-parity-shots.mjs`, `sheep-flock-parity-shots.mjs`, `water-clouds-balloon-parity-shots.mjs`, `station-travelers-and-birds-parity-shots.mjs`, `signoff-parity-shots.mjs` (all in `tools/parity/`) | shot sets kept out of the main list |
+| Per-subsystem probes | `station-runtime-probe.mjs`, `village-windmill-runtime-probe.mjs`, `forest-residents-runtime-probe.mjs`, `sheep-flock-runtime-probe.mjs`, `water-clouds-balloon-runtime-probe.mjs`, `station-travelers-and-birds-runtime-probe.mjs`, `scenario-probe-sections.mjs`, `signoff-state-probe.mjs`, `camera-ui-runtime-probe.mjs` | probe sections and their verdicts |
+| Browser checks | `hook-and-debug-menu-browser-checks.mjs`, `post-pass-synthetic-input-probe.mjs` | hook exposure, debug menu, live clock; post-pass outputs on synthetic inputs |
+| Sign-off CLIs and maths | `parity-metrics-math.mjs`, `performance-budget-probe.mjs`, `research-recapture-and-contact-sheet.mjs`, `deployment-smoke-check.mjs` | `parity:perf`, `parity:research`, `parity:smoke` and their pure maths |
 
-## Feature traceability (147 IDs)
+## Feature traceability
 
-Every feature ID of the research inventory, its single owning phase, the files that implement it, the test or
-sign-off check that covers it, and the phases that contributed slots or helpers. "sign-off <id>" refers to the
-browser sign-off shots and probe states in `tools/parity/signoff-parity-shots.mjs`.
+All 147 scene features, grouped by area: the files that implement each one and
+the test or sign-off check that covers it. "sign-off <id>" refers to the browser sign-off shots and
+probe states in `tools/parity/signoff-parity-shots.mjs`; "smoke" to `npm run parity:smoke`.
 
-| ID | owner | files | covering test | contributors |
-|---|---|---|---|---|
-| F01.01 | P01 | index.html, `src/main-entry.js` | `tools/parity/deployment-smoke-check.mjs` (smoke), sign-off ov-day-t0 | – |
-| F01.02 | P01 | `styles/base-reset-and-utilities.css` | sign-off dom-hud-day, dom-help, dom-mobile-hud | – |
-| F01.03 | P01 | `src/ui/hud-button-renderers.js`, `src/ui/hud-dom-event-bindings.js`, `styles/hud-panel-and-controls.css` | `tests/unit/keyboard-shortcut-resolution.test.mjs`, sign-off dom-hud-day | – |
-| F01.04 | P01 | `styles/night-theme-overrides.css` | sign-off dom-hud-night | – |
-| F01.05 | P01 | `src/ui/hud-state-actions.js` | sign-off dom-help | – |
-| F01.06 | P01 | `src/ui/settings-schema-defaults.js`, `src/ui/settings-local-storage-persistence.js` | `tests/unit/settings-validation-and-persistence.test.mjs` | – |
-| F01.07 | P01 | `src/ui/keyboard-shortcuts.js` | `tests/unit/keyboard-shortcut-resolution.test.mjs` | P10 (flight keys) |
-| F01.08 | P01 | `src/ui/hud-dom-event-bindings.js` | `tests/unit/hud-right-click-reset-to-defaults.test.mjs` | – |
-| F01.09 | P01 | `src/ui/shortcut-toast.js`, `styles/toast-and-debug-menu.css` | sign-off dom-toast-bridge, hud-hidden | – |
-| F01.10 | P01 | `src/ui/loading-screen-step-runner.js`, `styles/loading-overlay.css` | `tests/unit/loading-screen-step-runner.test.mjs`, sign-off dom-loading | – |
-| F01.11 | P01 | `src/main-entry.js` | `tests/unit/overview-intro-and-camera-modes.test.mjs`, smoke check | P04 (hook), P03 |
-| F01.12 | P04 | `src/ui/debug-menu-panel.js`, `src/engine/parity-test-hook.js` | `tests/unit/parity-harness-pure-logic.test.mjs`, sign-off dom-debug | P01 (CSS) |
-| F01.13 | P01 | `assets/train-diorama-logo.svg`, `assets/clock-favicon.svg` | sign-off dom-loading (boxes), independence audit | – |
-| F02.01 | P03 | `src/engine/diorama.js` | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs` | P07, P10, P13 |
-| F02.02 | P03 | `src/engine/frame-loop-scheduler.js` | `tests/unit/frame-cadence-and-render-resolution.test.mjs` | P05, P12 |
-| F02.03 | P03 | `src/engine/time-of-day-palettes-and-transition.js` | `tests/unit/time-of-day-transition.test.mjs` | – |
-| F02.04 | P02 | `src/materials/shared-lighting-uniforms.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | P03 |
-| F02.05 | P03 | `src/materials/procedural-sky-dome-material.js`, `src/engine/diorama-scene-composition.js` | `tests/unit/time-of-day-transition.test.mjs`, `tests/unit/diorama-scene-composition-order.test.mjs` | – |
-| F02.06 | P03 | `src/engine/custom-shadow-depth-pass.js` | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs` | – |
-| F02.07 | P03 | `src/engine/post-ink-outline-dither-pass.js` | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs`, sign-off ink-off | – |
-| F02.08 | P03 | `src/engine/render-resolution-resizer.js` | `tests/unit/frame-cadence-and-render-resolution.test.mjs`, sign-off pixel-360/720 | – |
-| F02.09 | P03 | `src/engine/cameras/overview-orbit-camera.js` | `tests/unit/overview-intro-and-camera-modes.test.mjs` | – |
-| F02.10 | P10 | `src/engine/cameras/free-fly-pointer-lock-camera.js` | `tests/unit/free-fly-fly-along-and-bridge-camera-rigs.test.mjs`, `tests/parity/camera-modes-parity.test.mjs` | P03 (PLC creation) |
-| F02.11 | P10 | `src/engine/cameras/train-fly-along-camera-rig.js` | `tests/parity/camera-modes-parity.test.mjs`, sign-off train-day | – |
-| F02.12 | P10 | `src/engine/cameras/bridge-tripod-camera.js` | `tests/parity/camera-modes-parity.test.mjs`, sign-off bridge-day | – |
-| F02.13 | P07 | `src/train/train-station-motion-controller.js` | `tests/unit/train-station-motion-controller.test.mjs` | – |
-| F02.14 | P07 | `src/train/locomotive-smoke-puff-pool.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | – |
-| F02.15 | P07 | `src/train/train-frame-update.js`, `src/engine/night-light-glow-registry.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | P03 (glow registry) |
-| F02.16 | P03 | `src/engine/diorama.js`, `src/engine/cameras/camera-mode-director.js` | `tests/unit/camera-mode-director-switching.test.mjs`, smoke check (pagehide dispose) | P07, P10, P13 |
-| F03.01 | P02 | `src/materials/shared-lighting-uniforms.js`, `src/core/disable-three-color-management.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | – |
-| F03.02 | P02 | `src/materials/glsl/hash-and-value-noise-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | – |
-| F03.03 | P02 | `src/materials/glsl/npr-lighting-common-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | – |
-| F03.04 | P02 | `src/materials/glsl/npr-lighting-common-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs`, sign-off train-night | P07 |
-| F03.05 | P02 | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | – |
-| F03.06 | P02 | `src/materials/npr-cel-material-factory.js`, `src/materials/glsl/npr-vertex-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | – |
-| F03.07 | P02 | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | – |
-| F03.08 | P02 | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | P05 |
-| F03.09 | P02 | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | P05 |
-| F03.10 | P02 | `src/materials/glsl/npr-vertex-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` | P09 |
-| F03.11 | P12 | `src/materials/water-surface-material.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F03.12 | P12 | `src/materials/waterfall-curtain-material.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F03.13 | P03 | `src/materials/procedural-sky-dome-material.js` | `tests/unit/time-of-day-transition.test.mjs`, sign-off ov-night-t0 | – |
-| F03.14 | P02 | `src/core/seeded-prng-and-gradient-noise.js` | `tests/unit/seeded-prng-and-gradient-noise.test.mjs` | – |
-| F03.15 | P02 | `src/geometry/merge-static-geometry-by-material.js` | `tests/unit/merge-static-geometry-and-glows.test.mjs` | – |
-| F03.16 | P02 | `src/effects/night-headlight-light-cone.js` | `tests/unit/merge-static-geometry-and-glows.test.mjs` | P07 |
-| F03.17 | P02 | `src/effects/night-light-glow-sprites.js` | `tests/unit/merge-static-geometry-and-glows.test.mjs` | – |
-| F04.01 | P05 | `src/world/world-constants.js`, `src/core/scalar-math-helpers.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` | – |
-| F04.02 | P05 | `src/world/terrain/river-distance-and-natural-height.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.03 | P05 | `src/world/track/track-spline-frames-and-queries.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.04 | P05 | `src/world/track/track-spline-frames-and-queries.js`, `src/world/world.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.05 | P05 | `src/world/track/bridge-span-detection.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.06 | P05 | `src/world/terrain/terrain-heightmap-grading.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.07 | P05 | `src/world/terrain/building-ground-flattening.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | P06, P08 |
-| F04.08 | P05 | `src/world/terrain/terrain-surface-mesh-and-vertex-colors.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.09 | P05 | `src/world/terrain/terrain-skirt-plinth-and-water-height-texture.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.10 | P05 | `src/world/terrain/terrain-skirt-plinth-and-water-height-texture.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.11 | P05 | `src/world/track/track-ballast-rails-sleepers.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F04.12 | P05 | `src/geometry/building-wall-and-roof-vents.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` | – |
-| F04.13 | P05 | `src/world/world-build-steps.js`, `src/world/world.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs`, `tests/parity/full-scene-signature-parity.test.mjs` | P06, P08, P09, P11, P12, P13 |
-| F04.14 | P11 | `src/life/sheep/sheep-pasture-ground-query.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F05.01 | P05 | `src/world/track/bridge-span-detection.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F05.02 | P05 | `src/world/bridge/bridge-deck-girders-and-railings.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F05.03 | P13 | `src/world/perches/bird-perch-builders.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | P05 (chord) |
-| F05.04 | P05 | `src/world/bridge/bridge-arch-columns-piers-abutments.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F05.05 | P05 | `src/world/bridge/bridge-arch-columns-piers-abutments.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` | – |
-| F05.06 | P06 | `src/world/station/station-site-placement.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.07 | P06 | `src/world/station/station-platform-shelter-bench.js` | `tests/parity/station-parity.test.mjs` | P13 (roof perch) |
-| F05.08 | P06 | `src/world/station/station-platform-shelter-bench.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.09 | P06 | `src/world/station/station-building-shell-and-roof.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.10 | P06 | `src/world/station/station-building-windows-and-shutters.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.11 | P06 | `src/world/station/station-wall-clock.js` | `tests/unit/station-sign-clock-and-build-counts.test.mjs` | – |
-| F05.12 | P06 | `src/world/station/station-name-board-sign.js` | `tests/unit/station-sign-clock-and-build-counts.test.mjs`, sign-off probe sign hash | – |
-| F05.13 | P06 | `src/world/station/station-lamps-with-night-glow.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.14 | P13 | `src/life/station/station-traveler-old-man-figure.js`, `src/life/station/station-walker-controller.js`, `src/life/station/station-figure-parts.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | P06 (slot) |
-| F05.15 | P13 | `src/life/station/station-grandmother-figure.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | P06 (slot) |
-| F05.16 | P13 | `src/life/station/station-travelers-idle-and-head-look.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F05.17 | P06 | `src/world/station/station-luggage-props.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.18 | P06 | `src/world/station/station-stairs-railings-footpath.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.19 | P06 | `src/world/station/station-stairs-railings-footpath.js` | `tests/parity/station-parity.test.mjs` | – |
-| F05.20 | P06 | `src/world/station/station-site-placement.js` | `tests/parity/station-parity.test.mjs` | – |
-| F06.01 | P05 | `src/geometry/procedural-geometry-helpers.js`, `src/geometry/building-wall-and-roof-vents.js`, `src/world/terrain/building-ground-flattening.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` | – |
-| F06.02 | P08 | `src/world/village/village-house-placement.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.03 | P08 | `src/world/village/village-house-body-and-roof.js`, `src/world/village/village-house-palette-materials.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.04 | P08 | `src/world/village/village-house-windows-and-shutters.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.05 | P08 | `src/world/village/village-chimney-smoke.js` | `tests/unit/village-and-windmill-build-logic.test.mjs` | – |
-| F06.06 | P08 | `src/world/village/village-house-placement.js`, `src/geometry/merge-static-geometry-by-material.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.07 | P08 | `src/world/village/village-shrubs-instanced.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.08 | P08 | `src/world/windmill/windmill-site-and-body.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.09 | P08 | `src/world/windmill/windmill-hay-bales.js` | `tests/parity/village-windmill-parity.test.mjs` | – |
-| F06.10 | P08 | `src/world/windmill/windmill-rotor.js` | `tests/unit/village-and-windmill-build-logic.test.mjs` | – |
-| F06.11 | P09 | `src/world/trees/tree-species-geometries.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` | – |
-| F06.12 | P09 | `src/world/trees/tree-scatter-rules.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` | – |
-| F06.13 | P09 | `src/world/trees/tree-instanced-layers.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` | P02 (sway shader) |
-| F06.14 | P09 | `src/world/trees/tree-canopy-height-grid.js` | `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` | – |
-| F06.15 | P09 | `src/world/rocks/riverside-rock-scatter.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` | – |
-| F06.16 | P11 | `src/life/sheep/sheep-geometry-and-instanced-meshes.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F06.17 | P11 | `src/life/sheep/pasture-sheep-spawner.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F06.18 | P11 | `src/life/sheep/trackside-sheep-flock-site.js`, `src/life/sheep/build-sheep-flock.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F07.01 | P12 | `src/world/water/river-water-and-waterfall-builder.js`, `src/materials/water-surface-material.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F07.02 | P12 | `src/world/water/river-water-and-waterfall-builder.js`, `src/materials/waterfall-curtain-material.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` | – |
-| F07.03 | P12 | `src/world/sky/cloud-field-spawner.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F07.04 | P12 | `src/world/sky/cloud-drift-fade-and-camera-avoidance.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` | – |
-| F07.05 | P12 | `src/world/sky/cloud-drift-fade-and-camera-avoidance.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` | – |
-| F07.06 | P13 | `src/world/perches/bird-perch-builders.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F07.07 | P12 | `src/world/balloon/hot-air-balloon-envelope-and-basket.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F07.08 | P12 | `src/world/balloon/hot-air-balloon-envelope-and-basket.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F07.09 | P12 | `src/world/balloon/hot-air-balloon-pilot-figure.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` | – |
-| F07.10 | P12 | `src/world/balloon/hot-air-balloon-burner-flame-and-flight.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` | – |
-| F07.11 | P11 | `src/life/sheep/track-sheep-escape-state-machine.js` | `tests/unit/track-sheep-escape-state-machine.test.mjs` | – |
-| F07.12 | P11 | `src/life/sheep/sheep-locomotion-and-route-motion.js` | `tests/parity/sheep-flock-oracle-train-parity.test.mjs` | – |
-| F07.13 | P11 | `src/life/sheep/sheep-instance-pose-writer.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F07.14 | P06 | `src/world/world-per-frame-update.js` | `tests/unit/station-sign-clock-and-build-counts.test.mjs`, `tests/parity/full-scene-signature-parity.test.mjs` | P08, P09, P11, P12, P13 |
-| F08.01 | P07 | `src/train/train-palette-materials.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.02 | P07 | `src/train/locomotive-boiler-and-cab-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.03 | P07 | `src/train/locomotive-boiler-and-cab-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.04 | P07 | `src/train/locomotive-driver-and-raven-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.05 | P07 | `src/train/locomotive-driver-and-raven-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.06 | P07 | `src/train/locomotive-front-end-and-lamps-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.07 | P07 | `src/train/locomotive-front-end-and-lamps-builder.js`, `src/effects/night-headlight-light-cone.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | P02 |
-| F08.08 | P07 | `src/train/rolling-stock-wheel-builders.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.09 | P07 | `src/train/tender-car-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.10 | P07 | `src/train/passenger-coach-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.11 | P07 | `src/train/train-mesh-helpers.js`, `src/train/train.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | P02 (merge) |
-| F08.12 | P07 | `src/train/train.js` | `tests/parity/train-model-and-motion-parity.test.mjs` | – |
-| F08.13 | P07 | `src/train/train-station-motion-controller.js` | `tests/unit/train-station-motion-controller.test.mjs` | – |
-| F08.14 | P07 | `src/train/locomotive-smoke-puff-pool.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | – |
-| F08.15 | P07 | `src/train/brake-sparks.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | – |
-| F08.16 | P07 | `src/train/brake-sparks.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | – |
-| F08.17 | P07 | `src/train/train-frame-update.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` | P02 (headlightAt) |
-| F08.18 | P07 | `src/engine/simulation-step.js`, `src/train/train-frame-update.js` | `tests/unit/frame-cadence-and-render-resolution.test.mjs`, `tests/parity/full-scene-signature-parity.test.mjs` | P03, P13 |
-| F09.01 | P13 | `src/life/birds/bird-geometry-builder.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.02 | P13 | `src/world/perches/bird-perch-builders.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.03 | P13 | `src/life/birds/bird-system.js`, `src/life/birds/bird-flock-state-machine.js` | `tests/unit/bird-flock-state-machine.test.mjs` | – |
-| F09.04 | P13 | `src/life/birds/bird-flight-poses.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.05 | P13 | `src/life/birds/bird-wing-body-animator.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.06 | P11 | `src/life/sheep/track-sheep-escape-state-machine.js` | `tests/unit/track-sheep-escape-state-machine.test.mjs` | – |
-| F09.07 | P11 | `src/life/sheep/sheep-geometry-and-instanced-meshes.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F09.08 | P11 | `src/life/sheep/pasture-sheep-spawner.js`, `src/life/sheep/sheep-locomotion-and-route-motion.js` | `tests/parity/sheep-flock-oracle-train-parity.test.mjs` | – |
-| F09.09 | P11 | `src/life/sheep/trackside-sheep-flock-site.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F09.10 | P11 | `src/life/sheep/sheep-instance-pose-writer.js` | `tests/parity/sheep-flock-parity.test.mjs` | – |
-| F09.11 | P13 | `src/life/station/station-traveler-old-man-figure.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.12 | P13 | `src/life/station/station-walker-controller.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.13 | P13 | `src/life/station/station-walker-leg-ik-and-body-animation.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.14 | P13 | `src/life/station/station-walker-leg-ik-and-body-animation.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.15 | P13 | `src/life/station/station-travelers-idle-and-head-look.js`, `src/life/station/station-grandmother-figure.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` | – |
-| F09.16 | P09 | `src/life/village/village-residents.js`, `src/life/village/village-woman-and-man-outfits.js`, `src/life/village/village-dog-builder.js`, `src/life/village/village-resident-materials-and-primitives.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` | – |
-| F09.17 | P09 | `src/life/village/village-residents.js` | `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` | – |
+### Page shell, HUD and UI
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Page shell and importmap | index.html, `src/main-entry.js` | `tools/parity/deployment-smoke-check.mjs` (smoke), sign-off ov-day-t0 |
+| Hand-written utility CSS (Tailwind class names, no build) | `styles/base-reset-and-utilities.css` | sign-off dom-hud-day, dom-help, dom-mobile-hud |
+| Bottom control panel (#hud-controls) | `src/ui/hud-button-renderers.js`, `src/ui/hud-dom-event-bindings.js`, `styles/hud-panel-and-controls.css` | `tests/unit/keyboard-shortcut-resolution.test.mjs`, sign-off dom-hud-day |
+| Night HUD theme | `styles/night-theme-overrides.css` | sign-off dom-hud-night |
+| Shortcuts button and help panel | `src/ui/hud-state-actions.js` | sign-off dom-help |
+| Settings state and localStorage persistence | `src/ui/settings-schema-defaults.js`, `src/ui/settings-local-storage-persistence.js` | `tests/unit/settings-validation-and-persistence.test.mjs` |
+| Keyboard shortcuts | `src/ui/keyboard-shortcuts.js` | `tests/unit/keyboard-shortcut-resolution.test.mjs` |
+| Right-click reset to defaults | `src/ui/hud-dom-event-bindings.js` | `tests/unit/hud-right-click-reset-to-defaults.test.mjs` |
+| Shortcut toast | `src/ui/shortcut-toast.js`, `styles/toast-and-debug-menu.css` | sign-off dom-toast-bridge, hud-hidden |
+| Loading screen step runner | `src/ui/loading-screen-step-runner.js`, `styles/loading-overlay.css` | `tests/unit/loading-screen-step-runner.test.mjs`, sign-off dom-loading |
+| Boot wiring and overview intro trigger | `src/main-entry.js` | `tests/unit/overview-intro-and-camera-modes.test.mjs`, smoke check |
+| Debug menu | `src/ui/debug-menu-panel.js`, `src/engine/parity-test-hook.js` | `tests/unit/parity-harness-pure-logic.test.mjs`, sign-off dom-debug |
+| Logo and favicon assets | `assets/train-diorama-logo.svg`, `assets/clock-favicon.svg` | sign-off dom-loading (boxes), independence audit |
+
+### Engine, render pipeline and cameras
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Renderer setup | `src/engine/diorama.js` | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs` |
+| Frame loop scheduler | `src/engine/frame-loop-scheduler.js` | `tests/unit/frame-cadence-and-render-resolution.test.mjs` |
+| Time-of-day palettes and transitions | `src/engine/time-of-day-palettes-and-transition.js` | `tests/unit/time-of-day-transition.test.mjs` |
+| Shared lighting uniform binding | `src/materials/shared-lighting-uniforms.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| Sky dome | `src/materials/procedural-sky-dome-material.js`, `src/engine/diorama-scene-composition.js` | `tests/unit/time-of-day-transition.test.mjs`, `tests/unit/diorama-scene-composition-order.test.mjs` |
+| Custom shadow depth pass | `src/engine/custom-shadow-depth-pass.js` | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs` |
+| Post pass: ink outline, saturation, grain, dither, vignette | `src/engine/post-ink-outline-dither-pass.js` | `tests/unit/shadow-post-and-render-pipeline-passes.test.mjs`, sign-off ink-off |
+| Pixel-art render resolution and resize | `src/engine/render-resolution-resizer.js` | `tests/unit/frame-cadence-and-render-resolution.test.mjs`, sign-off pixel-360/720 |
+| Overview orbit camera and intro | `src/engine/cameras/overview-orbit-camera.js` | `tests/unit/overview-intro-and-camera-modes.test.mjs` |
+| Free-fly pointer-lock camera | `src/engine/cameras/free-fly-pointer-lock-camera.js` | `tests/unit/free-fly-fly-along-and-bridge-camera-rigs.test.mjs`, `tests/parity/camera-modes-parity.test.mjs` |
+| Train fly-along cinematic rig | `src/engine/cameras/train-fly-along-camera-rig.js` | `tests/parity/camera-modes-parity.test.mjs`, sign-off train-day |
+| Bridge camera | `src/engine/cameras/bridge-tripod-camera.js` | `tests/parity/camera-modes-parity.test.mjs`, sign-off bridge-day |
+| Train station motion simulation | `src/train/train-station-motion-controller.js` | `tests/unit/train-station-motion-controller.test.mjs` |
+| Locomotive smoke puff pool | `src/train/locomotive-smoke-puff-pool.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` |
+| Headlight and night-glow per-frame updates | `src/train/train-frame-update.js`, `src/engine/night-light-glow-registry.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` |
+| Public API facade and dispose | `src/engine/diorama.js`, `src/engine/cameras/camera-mode-director.js` | `tests/unit/camera-mode-director-switching.test.mjs`, smoke check (pagehide dispose) |
+
+### Materials, shaders, noise and effects
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Shared uniform bag G + colour pipeline | `src/materials/shared-lighting-uniforms.js`, `src/core/disable-three-color-management.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| COMMON_GLSL hashes + value noise | `src/materials/glsl/hash-and-value-noise-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| shadowAt: custom 3x3 PCF shadow lookup | `src/materials/glsl/npr-lighting-common-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| headlightAt: train headlight spot on all surfaces at night | `src/materials/glsl/npr-lighting-common-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs`, sign-off train-night |
+| nprShade: cel banding + stipple + shadow tint + night mode | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| npr() cached material factory + vertex shader | `src/materials/npr-cel-material-factory.js`, `src/materials/glsl/npr-vertex-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| NPR fragment variants: emissive, NIGHT_GLOW, LOCAL_GLOW, DOUBLE_SIDED | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| STRATA cliff skirt shader | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| FLOWERS terrain shader | `src/materials/glsl/npr-fragment-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| TREE_SWAY instanced tree wind | `src/materials/glsl/npr-vertex-shader-glsl.js` | `tests/unit/npr-material-cache-and-glsl-parity.test.mjs` |
+| Water surface material | `src/materials/water-surface-material.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Waterfall material | `src/materials/waterfall-curtain-material.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Procedural sky dome | `src/materials/procedural-sky-dome-material.js` | `tests/unit/time-of-day-transition.test.mjs`, sign-off ov-night-t0 |
+| CPU noise: mulberry32, noise2, fbm | `src/core/seeded-prng-and-gradient-noise.js` | `tests/unit/seeded-prng-and-gradient-noise.test.mjs` |
+| mergeStaticGeometry(root, excluded) | `src/geometry/merge-static-geometry-by-material.js` | `tests/unit/merge-static-geometry-and-glows.test.mjs` |
+| createLightCone headlight beam | `src/effects/night-headlight-light-cone.js` | `tests/unit/merge-static-geometry-and-glows.test.mjs` |
+| createLightGlows instanced halo sprites | `src/effects/night-light-glow-sprites.js` | `tests/unit/merge-static-geometry-and-glows.test.mjs` |
+
+### World core: terrain and track
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Module constants and pure helpers | `src/world/world-constants.js`, `src/core/scalar-math-helpers.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` |
+| River distance field and natural height | `src/world/terrain/river-distance-and-natural-height.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Track spline and frames | `src/world/track/track-spline-frames-and-queries.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| nearest / inBridge / excluded / heightAt queries | `src/world/track/track-spline-frames-and-queries.js`, `src/world/world.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Bridge detection | `src/world/track/bridge-span-detection.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Heightmap grading | `src/world/terrain/terrain-heightmap-grading.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| flattenBuildingGround pads | `src/world/terrain/building-ground-flattening.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Terrain surface mesh and vertex colours | `src/world/terrain/terrain-surface-mesh-and-vertex-colors.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Strata skirt sides and wooden plinth | `src/world/terrain/terrain-skirt-plinth-and-water-height-texture.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Water height texture | `src/world/terrain/terrain-skirt-plinth-and-water-height-texture.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Track mesh: ballast, rails, sleepers | `src/world/track/track-ballast-rails-sleepers.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Shared building vent helpers | `src/geometry/building-wall-and-roof-vents.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` |
+| Constructor build order and PRNG sequencing | `src/world/world-build-steps.js`, `src/world/world.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs`, `tests/parity/full-scene-signature-parity.test.mjs` |
+| sheepGroundAt pasture query | `src/life/sheep/sheep-pasture-ground-query.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+
+### Bridge and station
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Bridge span detection (findBridge) | `src/world/track/bridge-span-detection.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Bridge deck girders, handrails and instanced railing posts | `src/world/bridge/bridge-deck-girders-and-railings.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Bridge bird perches | `src/world/perches/bird-perch-builders.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Bridge parabolic arch ribs (chord plane) | `src/world/bridge/bridge-arch-columns-piers-abutments.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Bridge spandrel columns, cross braces, approach piers, stone abutments | `src/world/bridge/bridge-arch-columns-piers-abutments.js` | `tests/parity/terrain-track-bridge-parity.test.mjs` |
+| Station placement, stop distance, camera start, exclusion | `src/world/station/station-site-placement.js` | `tests/parity/station-parity.test.mjs` |
+| Platform slab, edge line, shelter, roof perch | `src/world/station/station-platform-shelter-bench.js` | `tests/parity/station-parity.test.mjs` |
+| Bench | `src/world/station/station-platform-shelter-bench.js` | `tests/parity/station-parity.test.mjs` |
+| Station building shell, prism roof, vents, door, trims | `src/world/station/station-building-shell-and-roof.js` | `tests/parity/station-parity.test.mjs` |
+| Station windows, shutters, night glows | `src/world/station/station-building-windows-and-shutters.js` | `tests/parity/station-parity.test.mjs` |
+| Animated station wall clock | `src/world/station/station-wall-clock.js` | `tests/unit/station-sign-clock-and-build-counts.test.mjs` |
+| Station name board with canvas sign | `src/world/station/station-name-board-sign.js` | `tests/unit/station-sign-clock-and-build-counts.test.mjs`, sign-off probe sign hash |
+| Station lamps with night glow | `src/world/station/station-lamps-with-night-glow.js` | `tests/parity/station-parity.test.mjs` |
+| Walking old-man traveler figure (rig + StationWalker config) | `src/life/station/station-traveler-old-man-figure.js`, `src/life/station/station-walker-controller.js`, `src/life/station/station-figure-parts.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Grandmother figure (idle) | `src/life/station/station-grandmother-figure.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Traveler idle sway + head tracking of train (per frame) | `src/life/station/station-travelers-idle-and-head-look.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Luggage props | `src/world/station/station-luggage-props.js` | `tests/parity/station-parity.test.mjs` |
+| Side stairs, railings, landing pad | `src/world/station/station-stairs-railings-footpath.js` | `tests/parity/station-parity.test.mjs` |
+| Footpath ribbon draped on terrain | `src/world/station/station-stairs-railings-footpath.js` | `tests/parity/station-parity.test.mjs` |
+| Platform-extension shift baked into coordinates | `src/world/station/station-site-placement.js` | `tests/parity/station-parity.test.mjs` |
+
+### Village, windmill, forest, rocks and sheep placement
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Shared helpers: box / jitter / colorize / vents / flattenBuildingGround | `src/geometry/procedural-geometry-helpers.js`, `src/geometry/building-wall-and-roof-vents.js`, `src/world/terrain/building-ground-flattening.js` | `tests/unit/world-core-helpers-registry-and-golden-values.test.mjs` |
+| Village house placement (up to 8 cottages ringed around the pond) | `src/world/village/village-house-placement.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| House body, roof, chimney, door, trim | `src/world/village/village-house-body-and-roof.js`, `src/world/village/village-house-palette-materials.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| House windows, flower boxes, swinging shutters, night glows | `src/world/village/village-house-windows-and-shutters.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| Chimney smoke puffs (12 per house) + per-frame animation | `src/world/village/village-chimney-smoke.js` | `tests/unit/village-and-windmill-build-logic.test.mjs` |
+| Per-house static geometry merge | `src/world/village/village-house-placement.js`, `src/geometry/merge-static-geometry-by-material.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| Village shrubs (6 instanced bushes per house) | `src/world/village/village-shrubs-instanced.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| Windmill site, body, door, steps | `src/world/windmill/windmill-site-and-body.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| Windmill hay bales | `src/world/windmill/windmill-hay-bales.js` | `tests/parity/village-windmill-parity.test.mjs` |
+| Windmill rotor + spin animation | `src/world/windmill/windmill-rotor.js` | `tests/unit/village-and-windmill-build-logic.test.mjs` |
+| Tree species geometries | `src/world/trees/tree-species-geometries.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` |
+| Tree scatter rules (forest clumps) | `src/world/trees/tree-scatter-rules.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` |
+| Tree instanced layers + wind sway shader | `src/world/trees/tree-instanced-layers.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` |
+| Tree canopy height grid + treeCanopyHeightAt | `src/world/trees/tree-canopy-height-grid.js` | `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` |
+| Riverside rocks | `src/world/rocks/riverside-rock-scatter.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` |
+| Sheep geometry + instanced meshes | `src/life/sheep/sheep-geometry-and-instanced-meshes.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+| Free meadow sheep spawn (24) | `src/life/sheep/pasture-sheep-spawner.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+| Trackside sheep flock site + 3 track sheep | `src/life/sheep/trackside-sheep-flock-site.js`, `src/life/sheep/build-sheep-flock.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+
+### Water, clouds, balloon, perches and world update
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Water surface (pond + river) via height-texture discard | `src/world/water/river-water-and-waterfall-builder.js`, `src/materials/water-surface-material.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Waterfall off the front edge | `src/world/water/river-water-and-waterfall-builder.js`, `src/materials/waterfall-curtain-material.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` |
+| Procedural cloud field (3 layers, 33 clouds) | `src/world/sky/cloud-field-spawner.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Cloud drift, wrap and scale fade | `src/world/sky/cloud-drift-fade-and-camera-avoidance.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` |
+| Cloud camera avoidance (push-away + exponential return) | `src/world/sky/cloud-drift-fade-and-camera-avoidance.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` |
+| Trackside bird perches | `src/world/perches/bird-perch-builders.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Balloon envelope (checkerboard lathe) + local burner glow | `src/world/balloon/hot-air-balloon-envelope-and-basket.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Balloon basket, ropes, sandbags | `src/world/balloon/hot-air-balloon-envelope-and-basket.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Balloon pilot figure | `src/world/balloon/hot-air-balloon-pilot-figure.js` | `tests/parity/water-clouds-balloon-parity.test.mjs` |
+| Balloon burner, flame, night glow, flight path | `src/world/balloon/hot-air-balloon-burner-flame-and-flight.js` | `tests/unit/waterfall-cloud-avoidance-and-balloon-flight.test.mjs` |
+| Track-sheep escape state machine | `src/life/sheep/track-sheep-escape-state-machine.js` | `tests/unit/track-sheep-escape-state-machine.test.mjs` |
+| Sheep locomotion (pasture wander, sleep, route wander/height) | `src/life/sheep/sheep-locomotion-and-route-motion.js` | `tests/parity/sheep-flock-oracle-train-parity.test.mjs` |
+| Sheep instance pose writer (tilt, bounce, hop squash/stretch, legs, ears) | `src/life/sheep/sheep-instance-pose-writer.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+| World.update orchestrator + station clock, travelers, chimney smoke, windmill | `src/world/world-per-frame-update.js` | `tests/unit/station-sign-clock-and-build-counts.test.mjs`, `tests/parity/full-scene-signature-parity.test.mjs` |
+
+### Train
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Train material palette | `src/train/train-palette-materials.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Locomotive chassis, boiler, stack, dome, whistle, running boards | `src/train/locomotive-boiler-and-cab-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Locomotive cab with glazing | `src/train/locomotive-boiler-and-cab-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Driver figure | `src/train/locomotive-driver-and-raven-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Raven on driver's shoulder | `src/train/locomotive-driver-and-raven-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Locomotive front end and cowcatcher | `src/train/locomotive-front-end-and-lamps-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Lamps, halos, headlight anchor and beam | `src/train/locomotive-front-end-and-lamps-builder.js`, `src/effects/night-headlight-light-cone.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Locomotive wheels and static coupling rods | `src/train/rolling-stock-wheel-builders.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Tender car | `src/train/tender-car-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Passenger coaches x4 | `src/train/passenger-coach-builder.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Per-car static geometry merge | `src/train/train-mesh-helpers.js`, `src/train/train.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Car offsets, spline placement, wheel roll | `src/train/train.js` | `tests/parity/train-model-and-motion-parity.test.mjs` |
+| Motion state machine (station stop) | `src/train/train-station-motion-controller.js` | `tests/unit/train-station-motion-controller.test.mjs` |
+| Chimney smoke puffs | `src/train/locomotive-smoke-puff-pool.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` |
+| Brake sparks: emission | `src/train/brake-sparks.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` |
+| Brake sparks: physics and rendering | `src/train/brake-sparks.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` |
+| Night headlight pool on the world | `src/train/train-frame-update.js` | `tests/parity/train-simulation-oracle-and-composition-parity.test.mjs` |
+| Frame integration order | `src/engine/simulation-step.js`, `src/train/train-frame-update.js` | `tests/unit/frame-cadence-and-render-resolution.test.mjs`, `tests/parity/full-scene-signature-parity.test.mjs` |
+
+### Animated life
+
+| Feature | Files | Covering test or check |
+|---|---|---|
+| Bird geometry and rig | `src/life/birds/bird-geometry-builder.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Bird perches (World-side producer contract) | `src/world/perches/bird-perch-builders.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Bird flock setup and state machine | `src/life/birds/bird-system.js`, `src/life/birds/bird-flock-state-machine.js` | `tests/unit/bird-flock-state-machine.test.mjs` |
+| Bird flight poses | `src/life/birds/bird-flight-poses.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Bird orientation, flapping, glide, landing | `src/life/birds/bird-wing-body-animator.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Track sheep flock loop and log lines | `src/life/sheep/track-sheep-escape-state-machine.js` | `tests/unit/track-sheep-escape-state-machine.test.mjs` |
+| Sheep geometry and instancing | `src/life/sheep/sheep-geometry-and-instanced-meshes.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+| Pasture sheep placement, wander and night sleep | `src/life/sheep/pasture-sheep-spawner.js`, `src/life/sheep/sheep-locomotion-and-route-motion.js` | `tests/parity/sheep-flock-oracle-train-parity.test.mjs` |
+| Track clearing selection and track sheep routes | `src/life/sheep/trackside-sheep-flock-site.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+| Sheep per-frame matrices (bob, hop, squash, legs, ears) | `src/life/sheep/sheep-instance-pose-writer.js` | `tests/parity/sheep-flock-parity.test.mjs` |
+| Station traveler rig (the walker's figure) | `src/life/station/station-traveler-old-man-figure.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Station walker stepping state machine | `src/life/station/station-walker-controller.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Walker 2-bone leg IK (pose) | `src/life/station/station-walker-leg-ik-and-body-animation.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Walker body, arm and cane animation | `src/life/station/station-walker-leg-ik-and-body-animation.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Station travelers head-look and grandmother idle | `src/life/station/station-travelers-idle-and-head-look.js`, `src/life/station/station-grandmother-figure.js` | `tests/parity/station-travelers-and-birds-parity.test.mjs` |
+| Village resident figures (woman, man, dog) | `src/life/village/village-residents.js`, `src/life/village/village-woman-and-man-outfits.js`, `src/life/village/village-dog-builder.js`, `src/life/village/village-resident-materials-and-primitives.js` | `tests/parity/residents-trees-rocks-parity.test.mjs` |
+| Village walk cycle and idle animation | `src/life/village/village-residents.js` | `tests/unit/village-walk-cycle-and-tree-rock-scatter.test.mjs` |
